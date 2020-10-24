@@ -62,8 +62,12 @@ zp_code_len = zp_code_end - zp_code_start
 z80_pc_physical = lda_z80_pc_physical_abs_y + 1
 .z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
 .z80_pc_low_tmp equb 0 ; normally in Y, just temporary storage
-.z80_l equb 0
+.z80_b equb 0
+.z80_c equb 0
+.z80_d equb 0
+.z80_e equb 0
 .z80_h equb 0
+.z80_l equb 0
 .z80_sp equw 0
 .operand_ptr equw 0 ; low byte always 0
 .zp_tmp equb 0 ; temporary workspace
@@ -179,9 +183,27 @@ macro restore_pc_bank
     page_in_bank_a
 endmacro
 
+macro ld_r_8 r
+    advance_pc_and_load
+    sta r
+    jmp dispatch_loop
+endmacro
+
+macro ld_rr_16 high_r, low_r
+    advance_pc_and_load
+    sta low_r
+    advance_pc_and_load
+    sta high_r
+    jmp dispatch_loop
+endmacro
+
+; Instruction: ld c,*
+.opcode_handler_0e
+    ld_r_8 z80_c
+
 ; Instruction: ld de,**
 .opcode_handler_11
-    brk
+    ld_rr_16 z80_d, z80_e
 
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
@@ -212,6 +234,10 @@ endmacro
     ldy z80_pc_low_tmp
     jmp dispatch_loop_no_increment
 
+; Instruction: call **
+.opcode_handler_cd
+    brk
+
 ; TODO: MOVE MACRO TO TOP
 macro ld_r_s r, s
     lda s
@@ -241,7 +267,7 @@ endmacro
     equw opcode_todo ; &0b
     equw opcode_todo ; &0c
     equw opcode_todo ; &0d
-    equw opcode_todo ; &0e
+    equw opcode_handler_0e
     equw opcode_todo ; &0f
     equw opcode_todo ; &10
     equw opcode_handler_11
@@ -433,7 +459,7 @@ endmacro
     equw opcode_todo ; &ca
     equw opcode_todo ; &cb
     equw opcode_todo ; &cc
-    equw opcode_todo ; &cd
+    equw opcode_handler_cd
     equw opcode_todo ; &ce
     equw opcode_todo ; &cf
     equw opcode_todo ; &d0
