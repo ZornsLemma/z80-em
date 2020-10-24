@@ -1,0 +1,492 @@
+; For now I'm targetting a Master 128 and will use CMOS instructions freely.
+    cpu 1
+
+romsel = &fe30
+romsel_copy = &f4
+
+; TODO: I'm putting paging in a macro partly in case there's a way I can disable interrupts most of the time and then get away with not having to update romsel_copy
+macro page_in_bank_a
+    sta romsel_copy
+    sta romsel
+endmacro
+
+; TODO: This macro may not be all that useful if we only call it once, but let's go with it for now
+macro set_z80_pc_abs abs
+    ldx #hi(abs)
+    stx z80_pc_logical
+    lda swr_bank_table,x
+    page_in_bank_a
+    lda #(hi(abs) and %00111111) or %10000000
+    sta z80_pc_physical + 1
+    ldy #lo(abs)
+endmacro
+    
+; The main instruction dispatch loop is executed from zero page.
+; The handlers may use A and X as scratch registers but must preserve:
+; - Y, the low byte of the Z80 PC
+; - the currently paged in RAM bank is the one containing the Z80 PC
+    org 0
+    guard &90
+.zp_code_start
+.dispatch_loop
+{
+    iny
+    beq new_pc_page
+.new_pc_page_return
+.^dispatch_loop_no_increment
+.^lda_z80_pc_physical_abs_y
+    lda &ff00,y
+    asl a
+    tax
+    bcs top_bit_set_opcode
+    jmp (dispatch_table_low,x)
+.top_bit_set_opcode
+    jmp (dispatch_table_high,x)
+
+.new_pc_page
+    ; TODO: This could potentially be put into a subroutine without too much
+    ; performance impact if we're short on zero page space.
+    inc z80_pc_logical + 1
+    inc z80_pc_physical + 1
+    lda z80_pc_physical + 1
+    cmp #&c0
+    bne new_pc_page_return
+    jsr update_z80_pc_physical
+    jmp new_pc_page_return
+}
+.zp_code_end
+zp_code_len = zp_code_end - zp_code_start
+
+; Zero page variables
+.z80_pc_logical equw 0
+z80_pc_physical = lda_z80_pc_physical_abs_y + 1
+.z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
+.z80_pc_low_tmp equb 0 ; normally in Y, just temporary storage
+.z80_l equb 0
+.z80_h equb 0
+.operand_ptr equw 0 ; low byte always 0
+.zp_tmp equb 0 ; temporary workspace
+
+    
+    org &e00
+    guard &8000
+.start
+    ; Copy the zero page code into the correct location.
+{
+    ldy #zp_code_len - 1
+.loop
+    lda zp_code_copy,y
+    sta zp_code_start,y
+    dey
+    bpl loop
+}
+
+    ; Initialise zero page.
+    lda #0
+    sta operand_ptr
+
+    ; Store top of RAM at address 6. TODO: This is a bit of a hack but it seems
+    ; to be what zexall wants to initialise sp; I suspect eventually this will
+    ; be populated by the CP/M BDOS or whatever.
+    lda #4
+    page_in_bank_a
+    lda #0
+    sta &8006
+    lda #&f0
+    sta &8007
+
+    ; TODO: This isn't the right start address, but during initial development I
+    ; will just have a validation program pre-loaded into memory here.
+    set_z80_pc_abs &100
+
+    ; Start executing instructions.
+    jmp dispatch_loop_no_increment
+
+
+; Update z80_pc_physical and page in the correct RAM bank to match z80_pc_logical.
+.update_z80_pc_physical
+    ldx z80_pc_logical + 1
+    lda swr_bank_table,x
+    page_in_bank_a
+    txa
+    and #%00111111
+    ora #%10000000
+    sta z80_pc_physical + 1
+    rts
+
+
+    ; TODO: Get rid of this when all opcodes implemented
+.opcode_todo
+    brk
+
+    ; TODO MOVE MACROS TO TOP
+macro advance_pc_and_load
+    iny
+    ; TODO: Can I avoid having to take the branch in the common case?
+    bne not_new_pc_page
+    ; TODO: Copy of code in zp dispatch loop, factor out using a macro?
+    inc z80_pc_logical + 1
+    inc z80_pc_physical + 1
+    lda z80_pc_physical + 1
+    cmp #&c0
+    bne not_new_pc_page
+    jsr update_z80_pc_physical
+.not_new_pc_page
+    lda (z80_pc_physical),y
+endmacro
+
+; TODO: DESCRIBE
+.set_operand_ptr_using_a
+    tax
+    and #%00111111
+    ora #%10000000
+    sta operand_ptr + 1
+    lda swr_bank_table,x
+    page_in_bank_a
+    rts
+
+; Increment Y and/or operand_ptr so lda (operand_ptr),y accesses the next byte.
+.bump_operand_ptr_y
+{
+    iny
+    beq new_page
+    rts
+.new_page
+    inc operand_ptr + 1
+    lda operand_ptr + 1
+    cmp #&c0
+    beq new_bank
+    rts
+.new_bank
+    lda #&80
+    sta operand_ptr + 1
+    ; TODO: This is a hack - it relies on the banks being contiguous on Master.
+    lda romsel_copy
+    inc a
+    page_in_bank_a
+    rts
+}
+
+; TODO: Maybe fold storing/restoring Y into these macros as well? Change name of course.
+macro store_pc_bank
+    lda romsel_copy
+    sta z80_pc_physical_bank_tmp
+endmacro
+
+macro restore_pc_bank
+    lda z80_pc_physical_bank_tmp
+    page_in_bank_a
+endmacro
+
+; Instruction: ld hl,(**)
+.opcode_handler_2a
+    advance_pc_and_load
+    sta zp_tmp
+    advance_pc_and_load
+    jsr set_operand_ptr_using_a
+    sty z80_pc_low_tmp
+    store_pc_bank
+    ldy zp_tmp
+    lda (operand_ptr),y
+    sta z80_l
+    jsr bump_operand_ptr_y
+    lda (operand_ptr),y
+    sta z80_h
+    ldy z80_pc_low_tmp
+    restore_pc_bank
+    jmp dispatch_loop
+    
+; Instruction: jp **
+.opcode_handler_c3
+    advance_pc_and_load
+    sta z80_pc_low_tmp
+    advance_pc_and_load
+    sta z80_pc_logical + 1
+    jsr update_z80_pc_physical
+    ldy z80_pc_low_tmp
+    jmp dispatch_loop_no_increment
+
+; Instruction: ld sp,hl
+.opcode_handler_f9
+    brk
+
+
+    align &100
+.dispatch_table_low
+    equw opcode_todo ; &00
+    equw opcode_todo ; &01
+    equw opcode_todo ; &02
+    equw opcode_todo ; &03
+    equw opcode_todo ; &04
+    equw opcode_todo ; &05
+    equw opcode_todo ; &06
+    equw opcode_todo ; &07
+    equw opcode_todo ; &08
+    equw opcode_todo ; &09
+    equw opcode_todo ; &0a
+    equw opcode_todo ; &0b
+    equw opcode_todo ; &0c
+    equw opcode_todo ; &0d
+    equw opcode_todo ; &0e
+    equw opcode_todo ; &0f
+    equw opcode_todo ; &10
+    equw opcode_todo ; &11
+    equw opcode_todo ; &12
+    equw opcode_todo ; &13
+    equw opcode_todo ; &14
+    equw opcode_todo ; &15
+    equw opcode_todo ; &16
+    equw opcode_todo ; &17
+    equw opcode_todo ; &18
+    equw opcode_todo ; &19
+    equw opcode_todo ; &1a
+    equw opcode_todo ; &1b
+    equw opcode_todo ; &1c
+    equw opcode_todo ; &1d
+    equw opcode_todo ; &1e
+    equw opcode_todo ; &1f
+    equw opcode_todo ; &20
+    equw opcode_todo ; &21
+    equw opcode_todo ; &22
+    equw opcode_todo ; &23
+    equw opcode_todo ; &24
+    equw opcode_todo ; &25
+    equw opcode_todo ; &26
+    equw opcode_todo ; &27
+    equw opcode_todo ; &28
+    equw opcode_todo ; &29
+    equw opcode_handler_2a
+    equw opcode_todo ; &2b
+    equw opcode_todo ; &2c
+    equw opcode_todo ; &2d
+    equw opcode_todo ; &2e
+    equw opcode_todo ; &2f
+    equw opcode_todo ; &30
+    equw opcode_todo ; &31
+    equw opcode_todo ; &32
+    equw opcode_todo ; &33
+    equw opcode_todo ; &34
+    equw opcode_todo ; &35
+    equw opcode_todo ; &36
+    equw opcode_todo ; &37
+    equw opcode_todo ; &38
+    equw opcode_todo ; &39
+    equw opcode_todo ; &3a
+    equw opcode_todo ; &3b
+    equw opcode_todo ; &3c
+    equw opcode_todo ; &3d
+    equw opcode_todo ; &3e
+    equw opcode_todo ; &3f
+    equw opcode_todo ; &40
+    equw opcode_todo ; &41
+    equw opcode_todo ; &42
+    equw opcode_todo ; &43
+    equw opcode_todo ; &44
+    equw opcode_todo ; &45
+    equw opcode_todo ; &46
+    equw opcode_todo ; &47
+    equw opcode_todo ; &48
+    equw opcode_todo ; &49
+    equw opcode_todo ; &4a
+    equw opcode_todo ; &4b
+    equw opcode_todo ; &4c
+    equw opcode_todo ; &4d
+    equw opcode_todo ; &4e
+    equw opcode_todo ; &4f
+    equw opcode_todo ; &50
+    equw opcode_todo ; &51
+    equw opcode_todo ; &52
+    equw opcode_todo ; &53
+    equw opcode_todo ; &54
+    equw opcode_todo ; &55
+    equw opcode_todo ; &56
+    equw opcode_todo ; &57
+    equw opcode_todo ; &58
+    equw opcode_todo ; &59
+    equw opcode_todo ; &5a
+    equw opcode_todo ; &5b
+    equw opcode_todo ; &5c
+    equw opcode_todo ; &5d
+    equw opcode_todo ; &5e
+    equw opcode_todo ; &5f
+    equw opcode_todo ; &60
+    equw opcode_todo ; &61
+    equw opcode_todo ; &62
+    equw opcode_todo ; &63
+    equw opcode_todo ; &64
+    equw opcode_todo ; &65
+    equw opcode_todo ; &66
+    equw opcode_todo ; &67
+    equw opcode_todo ; &68
+    equw opcode_todo ; &69
+    equw opcode_todo ; &6a
+    equw opcode_todo ; &6b
+    equw opcode_todo ; &6c
+    equw opcode_todo ; &6d
+    equw opcode_todo ; &6e
+    equw opcode_todo ; &6f
+    equw opcode_todo ; &70
+    equw opcode_todo ; &71
+    equw opcode_todo ; &72
+    equw opcode_todo ; &73
+    equw opcode_todo ; &74
+    equw opcode_todo ; &75
+    equw opcode_todo ; &76
+    equw opcode_todo ; &77
+    equw opcode_todo ; &78
+    equw opcode_todo ; &79
+    equw opcode_todo ; &7a
+    equw opcode_todo ; &7b
+    equw opcode_todo ; &7c
+    equw opcode_todo ; &7d
+    equw opcode_todo ; &7e
+    equw opcode_todo ; &7f
+.dispatch_table_high
+    equw opcode_todo ; &80
+    equw opcode_todo ; &81
+    equw opcode_todo ; &82
+    equw opcode_todo ; &83
+    equw opcode_todo ; &84
+    equw opcode_todo ; &85
+    equw opcode_todo ; &86
+    equw opcode_todo ; &87
+    equw opcode_todo ; &88
+    equw opcode_todo ; &89
+    equw opcode_todo ; &8a
+    equw opcode_todo ; &8b
+    equw opcode_todo ; &8c
+    equw opcode_todo ; &8d
+    equw opcode_todo ; &8e
+    equw opcode_todo ; &8f
+    equw opcode_todo ; &90
+    equw opcode_todo ; &91
+    equw opcode_todo ; &92
+    equw opcode_todo ; &93
+    equw opcode_todo ; &94
+    equw opcode_todo ; &95
+    equw opcode_todo ; &96
+    equw opcode_todo ; &97
+    equw opcode_todo ; &98
+    equw opcode_todo ; &99
+    equw opcode_todo ; &9a
+    equw opcode_todo ; &9b
+    equw opcode_todo ; &9c
+    equw opcode_todo ; &9d
+    equw opcode_todo ; &9e
+    equw opcode_todo ; &9f
+    equw opcode_todo ; &a0
+    equw opcode_todo ; &a1
+    equw opcode_todo ; &a2
+    equw opcode_todo ; &a3
+    equw opcode_todo ; &a4
+    equw opcode_todo ; &a5
+    equw opcode_todo ; &a6
+    equw opcode_todo ; &a7
+    equw opcode_todo ; &a8
+    equw opcode_todo ; &a9
+    equw opcode_todo ; &aa
+    equw opcode_todo ; &ab
+    equw opcode_todo ; &ac
+    equw opcode_todo ; &ad
+    equw opcode_todo ; &ae
+    equw opcode_todo ; &af
+    equw opcode_todo ; &b0
+    equw opcode_todo ; &b1
+    equw opcode_todo ; &b2
+    equw opcode_todo ; &b3
+    equw opcode_todo ; &b4
+    equw opcode_todo ; &b5
+    equw opcode_todo ; &b6
+    equw opcode_todo ; &b7
+    equw opcode_todo ; &b8
+    equw opcode_todo ; &b9
+    equw opcode_todo ; &ba
+    equw opcode_todo ; &bb
+    equw opcode_todo ; &bc
+    equw opcode_todo ; &bd
+    equw opcode_todo ; &be
+    equw opcode_todo ; &bf
+    equw opcode_todo ; &c0
+    equw opcode_todo ; &c1
+    equw opcode_todo ; &c2
+    equw opcode_handler_c3
+    equw opcode_todo ; &c4
+    equw opcode_todo ; &c5
+    equw opcode_todo ; &c6
+    equw opcode_todo ; &c7
+    equw opcode_todo ; &c8
+    equw opcode_todo ; &c9
+    equw opcode_todo ; &ca
+    equw opcode_todo ; &cb
+    equw opcode_todo ; &cc
+    equw opcode_todo ; &cd
+    equw opcode_todo ; &ce
+    equw opcode_todo ; &cf
+    equw opcode_todo ; &d0
+    equw opcode_todo ; &d1
+    equw opcode_todo ; &d2
+    equw opcode_todo ; &d3
+    equw opcode_todo ; &d4
+    equw opcode_todo ; &d5
+    equw opcode_todo ; &d6
+    equw opcode_todo ; &d7
+    equw opcode_todo ; &d8
+    equw opcode_todo ; &d9
+    equw opcode_todo ; &da
+    equw opcode_todo ; &db
+    equw opcode_todo ; &dc
+    equw opcode_todo ; &dd
+    equw opcode_todo ; &de
+    equw opcode_todo ; &df
+    equw opcode_todo ; &e0
+    equw opcode_todo ; &e1
+    equw opcode_todo ; &e2
+    equw opcode_todo ; &e3
+    equw opcode_todo ; &e4
+    equw opcode_todo ; &e5
+    equw opcode_todo ; &e6
+    equw opcode_todo ; &e7
+    equw opcode_todo ; &e8
+    equw opcode_todo ; &e9
+    equw opcode_todo ; &ea
+    equw opcode_todo ; &eb
+    equw opcode_todo ; &ec
+    equw opcode_todo ; &ed
+    equw opcode_todo ; &ee
+    equw opcode_todo ; &ef
+    equw opcode_todo ; &f0
+    equw opcode_todo ; &f1
+    equw opcode_todo ; &f2
+    equw opcode_todo ; &f3
+    equw opcode_todo ; &f4
+    equw opcode_todo ; &f5
+    equw opcode_todo ; &f6
+    equw opcode_todo ; &f7
+    equw opcode_todo ; &f8
+    equw opcode_handler_f9
+    equw opcode_todo ; &fa
+    equw opcode_todo ; &fb
+    equw opcode_todo ; &fc
+    equw opcode_todo ; &fd
+    equw opcode_todo ; &fe
+    equw opcode_todo ; &ff
+
+    align &100
+.swr_bank_table
+    for i, 0, &ff
+        equb 4 + i / &40
+    next
+
+
+.zp_code_copy
+    skip zp_code_len
+    copyblock zp_code_start, zp_code_end, zp_code_copy
+
+.end
+
+    puttext "boot.txt", "!BOOT", 0
+    ; TODO: Starting with a self-built version of the documented instructions test - I may 
+    ; well do undocumented instructions eventually but seems best to start with the more
+    ; useful ones.
+    putfile "zexall/zexdoc-sf.cim", "T.ZEXALL", &8100, &8100
+    save "Z80EM", start, end
