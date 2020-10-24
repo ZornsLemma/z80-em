@@ -202,6 +202,7 @@ endmacro
     sta z80_pc_low_tmp
     advance_pc_and_load
     sta z80_pc_logical + 1
+    ; SFTODO: JUST POSSIBLY THE NEXT THREE INSTURCTIONS COULD BE REARRANGED AND WE COULD JMP UPDATE_Z80_PC_PHYSICAL WHICH WOULD TRANSFER CONTROL BACK TO DISPATCH LOOP
     jsr update_z80_pc_physical
     ldy z80_pc_low_tmp
     jmp dispatch_loop_no_increment
