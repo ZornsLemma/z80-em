@@ -141,6 +141,7 @@ macro advance_pc_and_load
 endmacro
 
 ; TODO: DESCRIBE
+; TODO: MAKE A MACRO?
 .set_operand_ptr_using_a
     tax
     and #%00111111
@@ -151,6 +152,7 @@ endmacro
     rts
 
 ; Increment Y and/or operand_ptr so lda (operand_ptr),y accesses the next byte.
+; TODO: MAKE A MACRO?
 .bump_operand_ptr_y
 {
     iny
