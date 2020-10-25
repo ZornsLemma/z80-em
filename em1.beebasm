@@ -13,11 +13,11 @@ endmacro
 ; TODO: This macro may not be all that useful if we only call it once, but let's go with it for now
 macro set_z80_pc_abs abs
     ldx #hi(abs)
-    stx z80_pc_logical
+    stx z80_pch_logical
     lda swr_bank_table,x
     page_in_bank_a
     lda #(hi(abs) and %00111111) or %10000000
-    sta z80_pc_physical + 1
+    sta z80_pch_physical
     ldy #lo(abs)
 endmacro
     
@@ -46,20 +46,21 @@ endmacro
 .new_pc_page
     ; TODO: This could potentially be put into a subroutine without too much
     ; performance impact if we're short on zero page space.
-    inc z80_pc_logical + 1
-    inc z80_pc_physical + 1
-    lda z80_pc_physical + 1
+    inc z80_pch_logical
+    inc z80_pch_physical
+    lda z80_pch_physical
     cmp #&c0
     bne new_pc_page_return
-    jsr update_z80_pc_physical
+    jsr update_z80_pch_physical
     jmp new_pc_page_return
 }
 .zp_code_end
 zp_code_len = zp_code_end - zp_code_start
 
 ; Zero page variables
-.z80_pc_logical equw 0
+.z80_pch_logical equb 0
 z80_pc_physical = lda_z80_pc_physical_abs_y + 1
+z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
 .z80_pc_low_tmp equb 0 ; normally in Y, just temporary storage
 .z80_b equb 0
@@ -70,7 +71,7 @@ z80_pc_physical = lda_z80_pc_physical_abs_y + 1
 .z80_l equb 0
 .z80_sp equw 0
 .operand_ptr equw 0 ; low byte always 0
-.zp_tmp equb 0 ; temporary workspace
+.zp_tmp equw 0 ; temporary workspace
 
     
     org &e00
@@ -108,17 +109,27 @@ z80_pc_physical = lda_z80_pc_physical_abs_y + 1
     jmp dispatch_loop_no_increment
 
 
-; Update z80_pc_physical and page in the correct RAM bank to match z80_pc_logical.
-.update_z80_pc_physical
-    ldx z80_pc_logical + 1
+; Update z80_pch_physical and page in the correct RAM bank to match z80_pch_logical.
+.update_z80_pch_physical
+    ldx z80_pch_logical
     lda swr_bank_table,x
     page_in_bank_a
     txa
     and #%00111111
     ora #%10000000
-    sta z80_pc_physical + 1
+    sta z80_pch_physical
     rts
 
+.update_z80_pch_physical_and_dispatch
+; TODO: DUPLICATION OF CODE FOR PREV VERSION, SHARE VIA MACRO
+    ldx z80_pch_logical
+    lda swr_bank_table,x
+    page_in_bank_a
+    txa
+    and #%00111111
+    ora #%10000000
+    sta z80_pch_physical
+    jmp dispatch_loop_no_increment
 
     ; TODO: Get rid of this when all opcodes implemented
 .opcode_todo
@@ -130,12 +141,12 @@ macro advance_pc_and_load
     ; TODO: Can I avoid having to take the branch in the common case?
     bne not_new_pc_page
     ; TODO: Copy of code in zp dispatch loop, factor out using a macro?
-    inc z80_pc_logical + 1
-    inc z80_pc_physical + 1
-    lda z80_pc_physical + 1
+    inc z80_pch_logical
+    inc z80_pch_physical
+    lda z80_pch_physical
     cmp #&c0
     bne not_new_pc_page
-    jsr update_z80_pc_physical
+    jsr update_z80_pch_physical
 .not_new_pc_page
     lda (z80_pc_physical),y
 endmacro
@@ -224,21 +235,55 @@ endmacro
     ldy z80_pc_low_tmp
     restore_pc_bank
     jmp dispatch_loop
+
     
 ; Instruction: jp **
 .opcode_handler_c3
     advance_pc_and_load
     sta z80_pc_low_tmp
     advance_pc_and_load
-    sta z80_pc_logical + 1
-    ; SFTODO: JUST POSSIBLY THE NEXT THREE INSTURCTIONS COULD BE REARRANGED AND WE COULD JMP UPDATE_Z80_PC_PHYSICAL WHICH WOULD TRANSFER CONTROL BACK TO DISPATCH LOOP
-    jsr update_z80_pc_physical
+    sta z80_pch_logical
     ldy z80_pc_low_tmp
-    jmp dispatch_loop_no_increment
+    jmp update_z80_pch_physical_and_dispatch
+
+macro push high, low
+    sec
+    lda z80_sp
+    sbc #2
+    sta z80_sp
+    tay
+    bcs no_borrow
+    dec z80_sp + 1
+.no_borrow
+    lda z80_sp + 1
+    jsr set_operand_ptr_using_a
+    ; TODO: Which order do the bytes get pushed onto the stack?
+    lda high
+    sta (operand_ptr),y
+    jsr bump_operand_ptr_y
+    lda low
+    sta (operand_ptr),y
+endmacro
 
 ; Instruction: call **
 .opcode_handler_cd
-    brk
+{
+    advance_pc_and_load
+    sta z80_pc_low_tmp
+    advance_pc_and_load
+    sta zp_tmp
+    ; Push the address of the next instruction onto the stack.
+    iny
+    bne no_carry
+    inc z80_pch_logical
+.no_carry
+    sty zp_tmp + 1
+    push z80_pch_logical, zp_tmp + 1
+    lda zp_tmp
+    sta z80_pch_logical
+    ldy z80_pc_low_tmp
+    jmp update_z80_pch_physical_and_dispatch
+}
 
 ; TODO: MOVE MACRO TO TOP
 macro ld_r_s r, s
