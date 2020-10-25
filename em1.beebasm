@@ -9,6 +9,10 @@ macro page_in_bank_a
     sta romsel_copy
     sta romsel
 endmacro
+macro page_in_bank_y
+    sty romsel_copy
+    sty romsel
+endmacro
 
 ; TODO: This macro may not be all that useful if we only call it once, but let's go with it for now
 macro set_z80_pc_abs abs
@@ -62,7 +66,7 @@ zp_code_len = zp_code_end - zp_code_start
 z80_pc_physical = lda_z80_pc_physical_abs_y + 1
 z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
-.z80_pc_low_tmp equb 0 ; normally in Y, just temporary storage
+.z80_pcl_tmp equb 0 ; normally in Y, just temporary storage
 .z80_b equb 0
 .z80_c equb 0
 .z80_d equb 0
@@ -186,14 +190,16 @@ endmacro
 }
 
 ; TODO: Maybe fold storing/restoring Y into these macros as well? Change name of course.
-macro store_pc_bank
-    lda romsel_copy
-    sta z80_pc_physical_bank_tmp
+macro store_pc_bank_and_y
+    sty z80_pcl_tmp
+    ldy romsel_copy
+    sty z80_pc_physical_bank_tmp
 endmacro
 
-macro restore_pc_bank
-    lda z80_pc_physical_bank_tmp
-    page_in_bank_a
+macro restore_pc_bank_and_y
+    ldy z80_pc_physical_bank_tmp
+    page_in_bank_y
+    ldy z80_pcl_tmp
 endmacro
 
 macro ld_r_8 r
@@ -223,30 +229,29 @@ endmacro
     advance_pc_and_load
     sta zp_tmp
     advance_pc_and_load
+    store_pc_bank_and_y
     jsr set_operand_ptr_using_a
-    sty z80_pc_low_tmp
-    store_pc_bank
     ldy zp_tmp
     lda (operand_ptr),y
     sta z80_l
     jsr bump_operand_ptr_y
     lda (operand_ptr),y
     sta z80_h
-    ldy z80_pc_low_tmp
-    restore_pc_bank
+    restore_pc_bank_and_y
     jmp dispatch_loop
 
     
 ; Instruction: jp **
 .opcode_handler_c3
     advance_pc_and_load
-    sta z80_pc_low_tmp
+    sta z80_pcl_tmp
     advance_pc_and_load
     sta z80_pch_logical
-    ldy z80_pc_low_tmp
+    ldy z80_pcl_tmp
     jmp update_z80_pch_physical_and_dispatch
 
-macro push high, low
+
+macro push_internal high, low, save_pc_bank_and_y
     sec
     lda z80_sp
     sbc #2
@@ -255,21 +260,31 @@ macro push high, low
     bcs no_borrow
     dec z80_sp + 1
 .no_borrow
+if save_pc_bank_and_y
+    store_pc_bank_and_y
+endif
     lda z80_sp + 1
     jsr set_operand_ptr_using_a
     ; TODO: Which order do the bytes get pushed onto the stack?
-    lda high
-    sta (operand_ptr),y
-    jsr bump_operand_ptr_y
     lda low
     sta (operand_ptr),y
+    jsr bump_operand_ptr_y
+    lda high
+    sta (operand_ptr),y
+if save_pc_bank_and_y
+    restore_pc_bank_and_y
+endif
+endmacro
+
+macro push_corrupt_pc_bank_and_y high, low
+    push_internal high, low, FALSE
 endmacro
 
 ; Instruction: call **
 .opcode_handler_cd
 {
     advance_pc_and_load
-    sta z80_pc_low_tmp
+    sta z80_pcl_tmp
     advance_pc_and_load
     sta zp_tmp
     ; Push the address of the next instruction onto the stack.
@@ -278,10 +293,10 @@ endmacro
     inc z80_pch_logical
 .no_carry
     sty zp_tmp + 1
-    push z80_pch_logical, zp_tmp + 1
+    push_corrupt_pc_bank_and_y z80_pch_logical, zp_tmp + 1
     lda zp_tmp
     sta z80_pch_logical
-    ldy z80_pc_low_tmp
+    ldy z80_pcl_tmp
     jmp update_z80_pch_physical_and_dispatch
 }
 
@@ -290,6 +305,10 @@ macro ld_r_s r, s
     lda s
     sta r
 endmacro
+
+; Instruction: push af
+.opcode_handler_f5
+    brk
 
 ; Instruction: ld sp,hl
 .opcode_handler_f9
@@ -546,7 +565,7 @@ endmacro
     equw opcode_todo ; &f2
     equw opcode_todo ; &f3
     equw opcode_todo ; &f4
-    equw opcode_todo ; &f5
+    equw opcode_handler_f5
     equw opcode_todo ; &f6
     equw opcode_todo ; &f7
     equw opcode_todo ; &f8
