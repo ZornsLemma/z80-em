@@ -252,6 +252,9 @@ endmacro
 
 
 macro push_internal high, low, save_pc_bank_and_y
+if save_pc_bank_and_y
+    store_pc_bank_and_y
+endif
     sec
     lda z80_sp
     sbc #2
@@ -260,12 +263,9 @@ macro push_internal high, low, save_pc_bank_and_y
     bcs no_borrow
     dec z80_sp + 1
 .no_borrow
-if save_pc_bank_and_y
-    store_pc_bank_and_y
-endif
     lda z80_sp + 1
     jsr set_operand_ptr_using_a
-    ; TODO: Which order do the bytes get pushed onto the stack?
+    ; TODO: Which order do the bytes get pushed onto the stack? This order seems logical but may not be correct.
     lda low
     sta (operand_ptr),y
     jsr bump_operand_ptr_y
