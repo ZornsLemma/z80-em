@@ -102,9 +102,12 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 ; Hybrid: SN H PZC
 ; Z80:    SZ H PNC
 hybrid_flag_s = 1 << 7 ; 6502 N flag
+hybrid_flag_n = 1 << 6
+hybrid_flag_h = 1 << 4
 hybrid_flag_z = 1 << 1 ; 6502 Z flag
 hybrid_flag_c = 1 << 0 ; 6502 C flag
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
+hybrid_flag_hnc = hybrid_flag_h or hybrid_flag_n or hybrid_flag_c
 
     org &e00
     guard &8000
@@ -415,6 +418,45 @@ endmacro
 .opcode_handler_03
     inc_rr z80_b, z80_c
 
+macro add_rr_ss r_high, r_low, s_high, s_low
+    ; Note that r and s may be the same, so we can't assume s_high is unchanged
+    ; when we come to determine H. There's no harm in doing this step first
+    ; anyway.
+    lda s_high
+    and #&0f
+    sta zp_tmp + 1
+    clc
+    lda r_low
+    adc s_low
+    sta r_low
+    lda r_high
+    tax
+    adc s_high
+    sta r_high
+    lda z80_f
+    and #not(hybrid_flag_hnc) and &ff
+    bcc no_carry
+    ora #hybrid_flag_c
+.no_carry
+    sta z80_f
+    txa
+    and #&0f
+    plp
+    adc zp_tmp + 1
+    and #&f0
+    beq no_half_carry
+    ; TODO: If we made H bit 0 of hybrid flags, we could replace the following three instructions with inc z80_f. Whether this is worthwhile depends on whether we use the 6502 C flag via php:pla to set the hybrid C flag at any point.
+    lda z80_f
+    ora #hybrid_flag_h
+    sta z80_f
+.no_half_carry
+    jmp dispatch_loop
+endmacro
+
+; Instruction: add hl,bc
+.opcode_handler_09
+    add_rr_ss z80_h, z80_l, z80_b, z80_c
+
 ; Instruction: dec bc
 .opcode_handler_0b
     dec_rr z80_b, z80_c
@@ -430,6 +472,10 @@ endmacro
 ; Instruction: inc de
 .opcode_handler_13
     inc_rr z80_d, z80_e
+
+; Instruction: add hl,de
+.opcode_handler_19
+    add_rr_ss z80_h, z80_l, z80_d, z80_e
 
 ; Instruction: dec de
 .opcode_handler_1b
@@ -464,6 +510,10 @@ endmacro
     restore_pc_bank_and_y
     jmp dispatch_loop
 
+; Instruction: add hl,hl
+.opcode_handler_29
+    add_rr_ss z80_h, z80_l, z80_h, z80_l
+
 ; Instruction: dec hl
 .opcode_handler_2b
     dec_rr z80_h, z80_l
@@ -483,6 +533,10 @@ endmacro
 ; Instruction: inc sp
 .opcode_handler_33
     inc_rr z80_sp + 1, z80_sp
+
+; Instruction: add hl,sp
+.opcode_handler_39
+    add_rr_ss z80_h, z80_l, z80_sp + 1, z80_sp
 
 ; Instruction: dec sp
 .opcode_handler_3b
@@ -661,7 +715,7 @@ endmacro
     equw opcode_todo ; &06
     equw opcode_todo ; &07
     equw opcode_todo ; &08
-    equw opcode_todo ; &09
+    equw opcode_handler_09
     equw opcode_todo ; &0a
     equw opcode_handler_0b
     equw opcode_todo ; &0c
@@ -677,7 +731,7 @@ endmacro
     equw opcode_todo ; &16
     equw opcode_todo ; &17
     equw opcode_todo ; &18
-    equw opcode_todo ; &19
+    equw opcode_handler_19
     equw opcode_todo ; &1a
     equw opcode_handler_1b
     equw opcode_todo ; &1c
@@ -693,7 +747,7 @@ endmacro
     equw opcode_todo ; &26
     equw opcode_todo ; &27
     equw opcode_todo ; &28
-    equw opcode_todo ; &29
+    equw opcode_handler_29
     equw opcode_handler_2a
     equw opcode_handler_2b
     equw opcode_todo ; &2c
@@ -709,7 +763,7 @@ endmacro
     equw opcode_todo ; &36
     equw opcode_todo ; &37
     equw opcode_todo ; &38
-    equw opcode_todo ; &39
+    equw opcode_handler_39
     equw opcode_todo ; &3a
     equw opcode_handler_3b
     equw opcode_todo ; &3c
