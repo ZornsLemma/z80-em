@@ -410,6 +410,19 @@ macro pop high, low
     pop_internal high, low, TRUE
 endmacro
 
+macro ex_r_s_fragment r, s
+    ldx s
+    lda r
+    stx r
+    sta s
+endmacro
+
+macro ex_rr_ss r_high, r_low, s_high, s_low
+    ex_r_s_fragment r_high, s_high
+    ex_r_s_fragment r_low, s_low
+    jmp dispatch_loop
+endmacro
+
 ; Instruction: ld bc,**
 .opcode_handler_01
     ld_rr_16 z80_b, z80_c
@@ -533,6 +546,10 @@ endmacro
 ; Instruction: inc sp
 .opcode_handler_33
     inc_rr z80_sp + 1, z80_sp
+
+; Instruction: ld (hl),*
+.opcode_handler_36
+    brk
 
 ; Instruction: add hl,sp
 .opcode_handler_39
@@ -658,6 +675,10 @@ endmacro
     push z80_h, z80_l
     jmp dispatch_loop
 
+; Instruction: ex de,hl
+.opcode_handler_eb
+    ex_rr_ss z80_d, z80_e, z80_h, z80_l
+
 ; Instruction: pop af
 .opcode_handler_f1
     pop z80_a, zp_tmp
@@ -760,7 +781,7 @@ endmacro
     equw opcode_handler_33
     equw opcode_todo ; &34
     equw opcode_todo ; &35
-    equw opcode_todo ; &36
+    equw opcode_handler_36
     equw opcode_todo ; &37
     equw opcode_todo ; &38
     equw opcode_handler_39
@@ -942,7 +963,7 @@ endmacro
     equw opcode_todo ; &e8
     equw opcode_todo ; &e9
     equw opcode_todo ; &ea
-    equw opcode_todo ; &eb
+    equw opcode_handler_eb
     equw opcode_todo ; &ec
     equw opcode_todo ; &ed
     equw opcode_todo ; &ee
