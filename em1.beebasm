@@ -100,18 +100,19 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 ; the Z80 flags as efficiently as possible, z80_f holds "hybrid flags" - these
 ; are the Z80 flags but rearranged to use the 6502 bit positions. These need to
 ; be converted to use the correct bit positions when exposed to code running on
-; the emulated Z80.
+; the emulated Z80. SFTODO: I AM ALSO TRYING TO "SHARE" THE V FLAG NOW
 ;
 ;        b76543210
-; Hybrid: SN H PZC
+; Hybrid: SP H NZC
 ; Z80:    SZ H PNC
 hybrid_flag_s = 1 << 7 ; 6502 N flag
-hybrid_flag_n = 1 << 6
+hybrid_flag_p = 1 << 6 ; 6502 V flag (Z80 P and Z80 V are same flag bit)
 hybrid_flag_h = 1 << 4
-hybrid_flag_p = 1 << 2
+hybrid_flag_n = 1 << 2
 hybrid_flag_z = 1 << 1 ; 6502 Z flag
 hybrid_flag_c = 1 << 0 ; 6502 C flag
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
+hybrid_flag_szpc = hybrid_flag_s or hybrid_flag_z or hybrid_flag_p or hybrid_flag_c
 hybrid_flag_hnc = hybrid_flag_h or hybrid_flag_n or hybrid_flag_c
 hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
 
@@ -350,6 +351,31 @@ macro or_6502_a
     jmp dispatch_loop
 endmacro
 
+macro cp_6502_a
+    ; TODO: Far from confident about the correctness of this!
+    sta zp_tmp
+    lda z80_a
+    sec
+    sbc zp_tmp
+    php
+    and #&0f
+    sta zp_tmp + 1
+    pla
+    eor #hybrid_flag_c
+    and #hybrid_flag_szpc
+    ora #hybrid_flag_n
+    sta z80_f
+    lda z80_a
+    and #&0f
+    cmp zp_tmp + 1
+    bcs no_half_carry
+    lda z80_f
+    ora #hybrid_flag_h
+    sta z80_f
+.no_half_carry
+    jmp dispatch_loop
+endmacro
+
 macro jp
     advance_pc_and_load
     sta z80_pcl_tmp
@@ -359,11 +385,15 @@ macro jp
     jmp update_z80_pch_physical_and_dispatch
 endmacro
 
-macro jp_flag_set hybrid_flag
-    ; TODO: We could probably write some if-else macro code to optimise detection of bits which we can test with the "bit" instruction rather than needing to do lda-then-and
+macro jp_flag_internal hybrid_flag, branch_if_set
+    ; TODO: We could probably write some if-else macro code to optimise detection of bits which we can test by implicit-set-on-lda z80_f
     lda z80_f
     and #hybrid_flag
+if branch_if_set
     beq no_branch
+else
+    bne no_branch
+endif
     jp
 .no_branch
     tya
@@ -374,6 +404,14 @@ macro jp_flag_set hybrid_flag
     jmp dispatch_loop_no_increment
 .carry
     jmp new_pc_page_and_dispatch_loop_no_increment
+endmacro
+
+macro jp_flag_set hybrid_flag
+    jp_flag_internal hybrid_flag, TRUE
+endmacro
+
+macro jp_flag_clear hybrid_flag
+    jp_flag_internal hybrid_flag, FALSE
 endmacro
 
 macro push_internal high, low, save_pc_bank_and_y
@@ -473,13 +511,27 @@ endmacro
 .opcode_handler_03
     inc_rr z80_b, z80_c
 
+; Instruction: dec b
+.opcode_handler_05
+    ; SFTODO MAKE SURE TO SET FLAGS CORRECTLY
+    brk
+
 ; Instruction: ld b,*
 .opcode_handler_06
     ld_r_8 z80_b
 
 ; Instruction: rlca
 .opcode_handler_07
-    brk
+    lda z80_a
+    cmp #&80
+    rol a
+    sta z80_a
+    lda z80_f
+    and_not hybrid_flag_hnc
+    assert hybrid_flag_c == 1
+    adc #0
+    sta z80_f
+    jmp dispatch_loop
 
 macro add_rr_ss r_high, r_low, s_high, s_low
     ; Note that r and s may be the same, so we can't assume s_high is unchanged
@@ -691,12 +743,13 @@ endmacro
     pop z80_b, z80_c
     jmp dispatch_loop
 
+; Instruction: jp nz,**
+.opcode_handler_c2
+    jp_flag_clear hybrid_flag_z
+
 ; Instruction: jp **
 .opcode_handler_c3
     jp
-
-
-    
 
 ; Instruction: push bc
 .opcode_handler_c5
@@ -765,14 +818,14 @@ endmacro
 .opcode_handler_f1
     pop z80_a, zp_tmp
     ldx zp_tmp
-    lda flag_permutation_table,x
+    lda z80_to_hybrid_flag_table,x
     sta z80_f
     jmp dispatch_loop
 
 ; Instruction: push af
 .opcode_handler_f5
     ldx z80_f
-    lda flag_permutation_table,x
+    lda hybrid_to_z80_flag_table,x
     sta zp_tmp
     push z80_a, zp_tmp
     jmp dispatch_loop
@@ -782,6 +835,11 @@ endmacro
     ld_r_s_fragment z80_sp    ,z80_l
     ld_r_s          z80_sp + 1,z80_h
     jmp dispatch_loop
+
+; Instruction: cp *
+.opcode_handler_fe
+    advance_pc_and_load
+    cp_6502_a
 
 ; Instruction: ldir
 .opcode_handler_ed_b0
@@ -851,7 +909,7 @@ endmacro
     equw opcode_todo ; &02
     equw opcode_handler_03
     equw opcode_todo ; &04
-    equw opcode_todo ; &05
+    equw opcode_handler_05
     equw opcode_handler_06
     equw opcode_handler_07
     equw opcode_todo ; &08
@@ -1041,7 +1099,7 @@ endmacro
     equw opcode_todo ; &bf
     equw opcode_todo ; &c0
     equw opcode_handler_c1
-    equw opcode_todo ; &c2
+    equw opcode_handler_c2
     equw opcode_handler_c3
     equw opcode_todo ; &c4
     equw opcode_handler_c5
@@ -1101,7 +1159,7 @@ endmacro
     equw opcode_todo ; &fb
     equw opcode_todo ; &fc
     equw opcode_todo ; &fd
-    equw opcode_todo ; &fe
+    equw opcode_handler_fe
     equw opcode_todo ; &ff
 
     align &100
