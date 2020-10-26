@@ -238,6 +238,15 @@ macro ld_r_ind_hl r
     lda (operand_ptr),y
     sta r
     restore_pc_bank_and_y
+    jmp dispatch_loop
+endmacro
+
+macro inc_rr high_r, low_r
+    inc low_r
+    bne no_carry
+    inc high_r
+.no_carry
+    jmp dispatch_loop
 endmacro
 
 macro push_internal high, low, save_pc_bank_and_y
@@ -310,6 +319,10 @@ endmacro
 .opcode_handler_01
     ld_rr_16 z80_b, z80_c
 
+; Instruction: inc bc
+.opcode_handler_03
+    inc_rr z80_b, z80_c
+
 ; Instruction: ld c,*
 .opcode_handler_0e
     ld_r_8 z80_c
@@ -318,13 +331,17 @@ endmacro
 .opcode_handler_11
     ld_rr_16 z80_d, z80_e
 
+; Instruction: inc de
+.opcode_handler_13
+    inc_rr z80_d, z80_e
+
 ; Instruction: ld hl,**
 .opcode_handler_21
     ld_rr_16 z80_h, z80_l
 
 ; Instruction: inc hl
 .opcode_handler_23
-    brk
+    inc_rr z80_h, z80_l
 
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
@@ -345,6 +362,10 @@ endmacro
 ; Instruction: ld sp,**
 .opcode_handler_31
     ld_rr_16 z80_sp + 1, z80_sp
+
+; Instruction: inc sp
+.opcode_handler_33
+    inc_rr z80_sp + 1, z80_sp
 
 ; Instruction: ld b,(hl)
 .opcode_handler_46
@@ -495,7 +516,7 @@ endmacro
     equw opcode_todo ; &00
     equw opcode_handler_01
     equw opcode_todo ; &02
-    equw opcode_todo ; &03
+    equw opcode_handler_03
     equw opcode_todo ; &04
     equw opcode_todo ; &05
     equw opcode_todo ; &06
@@ -511,7 +532,7 @@ endmacro
     equw opcode_todo ; &10
     equw opcode_handler_11
     equw opcode_todo ; &12
-    equw opcode_todo ; &13
+    equw opcode_handler_13
     equw opcode_todo ; &14
     equw opcode_todo ; &15
     equw opcode_todo ; &16
@@ -543,7 +564,7 @@ endmacro
     equw opcode_todo ; &30
     equw opcode_handler_31
     equw opcode_todo ; &32
-    equw opcode_todo ; &33
+    equw opcode_handler_33
     equw opcode_todo ; &34
     equw opcode_todo ; &35
     equw opcode_todo ; &36
