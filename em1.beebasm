@@ -67,6 +67,8 @@ z80_pc_physical = lda_z80_pc_physical_abs_y + 1
 z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
 .z80_pcl_tmp equb 0 ; normally in Y, just temporary storage
+.z80_a equb 0
+.z80_f equb 0 ; TODO: Do we want this?
 .z80_b equb 0
 .z80_c equb 0
 .z80_d equb 0
@@ -280,6 +282,15 @@ macro push_corrupt_pc_bank_and_y high, low
     push_internal high, low, FALSE
 endmacro
 
+macro push high,low
+    push_internal high, low, TRUE
+endmacro
+
+; Instruction: push bc
+.opcode_handler_c5
+    push z80_b, z80_c
+    jmp dispatch_loop
+
 ; Instruction: call **
 .opcode_handler_cd
 {
@@ -306,9 +317,21 @@ macro ld_r_s r, s
     sta r
 endmacro
 
+; Instruction: push de
+.opcode_handler_d5
+    push z80_d, z80_e
+    jmp dispatch_loop
+
+; Instruction: push hl
+.opcode_handler_e5
+    push z80_h, z80_l
+    jmp dispatch_loop
+
 ; Instruction: push af
 .opcode_handler_f5
-    brk
+    ; TODO: I don't have a flags implementation yet, this will just push junk
+    push z80_a, z80_f
+    jmp dispatch_loop
 
 ; Instruction: ld sp,hl
 .opcode_handler_f9
@@ -517,7 +540,7 @@ endmacro
     equw opcode_todo ; &c2
     equw opcode_handler_c3
     equw opcode_todo ; &c4
-    equw opcode_todo ; &c5
+    equw opcode_handler_c5
     equw opcode_todo ; &c6
     equw opcode_todo ; &c7
     equw opcode_todo ; &c8
@@ -533,7 +556,7 @@ endmacro
     equw opcode_todo ; &d2
     equw opcode_todo ; &d3
     equw opcode_todo ; &d4
-    equw opcode_todo ; &d5
+    equw opcode_handler_d5
     equw opcode_todo ; &d6
     equw opcode_todo ; &d7
     equw opcode_todo ; &d8
@@ -549,7 +572,7 @@ endmacro
     equw opcode_todo ; &e2
     equw opcode_todo ; &e3
     equw opcode_todo ; &e4
-    equw opcode_todo ; &e5
+    equw opcode_handler_e5
     equw opcode_todo ; &e6
     equw opcode_todo ; &e7
     equw opcode_todo ; &e8
