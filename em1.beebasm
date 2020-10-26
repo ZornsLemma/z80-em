@@ -323,6 +323,20 @@ macro dec_rr high_r, low_r
     jmp dispatch_loop
 endmacro
 
+macro and_6502_a
+    and z80_a
+    sta z80_a
+    tax
+    ; Clear N, C, set H and set S, Z, P according to result
+    php
+    pla
+    and #hybrid_flag_sz
+    ora #hybrid_flag_h
+    ora parity_table,x
+    sta z80_f
+    jmp dispatch_loop
+endmacro
+
 macro or_6502_a
     ora z80_a
     sta z80_a
@@ -462,6 +476,10 @@ endmacro
 ; Instruction: ld b,*
 .opcode_handler_06
     ld_r_8 z80_b
+
+; Instruction: rlca
+.opcode_handler_07
+    brk
 
 macro add_rr_ss r_high, r_low, s_high, s_low
     ; Note that r and s may be the same, so we can't assume s_high is unchanged
@@ -642,6 +660,10 @@ endmacro
 .opcode_handler_6f
     ld_r_s z80_l, z80_a
 
+; Instruction: ld a,c
+.opcode_handler_79
+    ld_r_s z80_a, z80_c
+
 ; Instruction: ld a,e
 .opcode_handler_7b
     ld_r_s z80_a, z80_e
@@ -656,7 +678,8 @@ endmacro
 
 ; Instruction: and c
 .opcode_handler_a1
-    brk
+    lda z80_c
+    and_6502_a
 
 ; Instruction: or (hl)
 .opcode_handler_b6
@@ -830,7 +853,7 @@ endmacro
     equw opcode_todo ; &04
     equw opcode_todo ; &05
     equw opcode_handler_06
-    equw opcode_todo ; &07
+    equw opcode_handler_07
     equw opcode_todo ; &08
     equw opcode_handler_09
     equw opcode_todo ; &0a
@@ -944,7 +967,7 @@ endmacro
     equw opcode_todo ; &76
     equw opcode_todo ; &77
     equw opcode_todo ; &78
-    equw opcode_todo ; &79
+    equw opcode_handler_79
     equw opcode_todo ; &7a
     equw opcode_handler_7b
     equw opcode_todo ; &7c
