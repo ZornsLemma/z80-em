@@ -461,7 +461,7 @@ endmacro
 
 ; Instruction: ld b,*
 .opcode_handler_06
-    brk
+    ld_r_8 z80_b
 
 macro add_rr_ss r_high, r_low, s_high, s_low
     ; Note that r and s may be the same, so we can't assume s_high is unchanged
@@ -518,6 +518,10 @@ endmacro
 ; Instruction: inc de
 .opcode_handler_13
     inc_rr z80_d, z80_e
+
+; Instruction: ld d,*
+.opcode_handler_16
+    ld_r_8 z80_d
 
 ; Instruction: add hl,de
 .opcode_handler_19
@@ -638,6 +642,10 @@ endmacro
 .opcode_handler_6f
     ld_r_s z80_l, z80_a
 
+; Instruction: ld a,e
+.opcode_handler_7b
+    ld_r_s z80_a, z80_e
+
 ; Instruction: ld a,(hl)
 .opcode_handler_7e
     ld_r_ind_hl z80_a
@@ -645,6 +653,10 @@ endmacro
 ; Instruction: ld a,a
 .opcode_handler_7f
     jmp dispatch_loop
+
+; Instruction: and c
+.opcode_handler_a1
+    brk
 
 ; Instruction: or (hl)
 .opcode_handler_b6
@@ -833,7 +845,7 @@ endmacro
     equw opcode_handler_13
     equw opcode_todo ; &14
     equw opcode_todo ; &15
-    equw opcode_todo ; &16
+    equw opcode_handler_16
     equw opcode_todo ; &17
     equw opcode_todo ; &18
     equw opcode_handler_19
@@ -934,7 +946,7 @@ endmacro
     equw opcode_todo ; &78
     equw opcode_todo ; &79
     equw opcode_todo ; &7a
-    equw opcode_todo ; &7b
+    equw opcode_handler_7b
     equw opcode_todo ; &7c
     equw opcode_todo ; &7d
     equw opcode_handler_7e
@@ -973,7 +985,7 @@ endmacro
     equw opcode_todo ; &9e
     equw opcode_todo ; &9f
     equw opcode_todo ; &a0
-    equw opcode_todo ; &a1
+    equw opcode_handler_a1
     equw opcode_todo ; &a2
     equw opcode_todo ; &a3
     equw opcode_todo ; &a4
