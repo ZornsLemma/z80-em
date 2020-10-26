@@ -230,6 +230,16 @@ macro ld_rr_16 high_r, low_r
     jmp dispatch_loop
 endmacro
 
+macro ld_r_ind_hl r
+    store_pc_bank_and_y
+    lda z80_h
+    jsr set_operand_ptr_using_a
+    ldy z80_l
+    lda (operand_ptr),y
+    sta r
+    restore_pc_bank_and_y
+endmacro
+
 macro push_internal high, low, save_pc_bank_and_y
 if save_pc_bank_and_y
     store_pc_bank_and_y
@@ -312,6 +322,10 @@ endmacro
 .opcode_handler_21
     ld_rr_16 z80_h, z80_l
 
+; Instruction: inc hl
+.opcode_handler_23
+    brk
+
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
     advance_pc_and_load
@@ -331,6 +345,34 @@ endmacro
 ; Instruction: ld sp,**
 .opcode_handler_31
     ld_rr_16 z80_sp + 1, z80_sp
+
+; Instruction: ld b,(hl)
+.opcode_handler_46
+    ld_r_ind_hl z80_b
+
+; Instruction: ld c,(hl)
+.opcode_handler_4e
+    ld_r_ind_hl z80_c
+
+; Instruction: ld d,(hl)
+.opcode_handler_56
+    ld_r_ind_hl z80_d
+
+; Instruction: ld e,(hl)
+.opcode_handler_5e
+    ld_r_ind_hl z80_e
+
+; Instruction: ld h,(hl)
+.opcode_handler_66
+    ld_r_ind_hl z80_h
+
+; Instruction: ld l,(hl)
+.opcode_handler_6e
+    ld_r_ind_hl z80_l
+
+; Instruction: ld a,(hl)
+.opcode_handler_7e
+    ld_r_ind_hl z80_a
 
 ; Instruction: pop bc
 .opcode_handler_c1
@@ -485,7 +527,7 @@ endmacro
     equw opcode_todo ; &20
     equw opcode_handler_21
     equw opcode_todo ; &22
-    equw opcode_todo ; &23
+    equw opcode_handler_23
     equw opcode_todo ; &24
     equw opcode_todo ; &25
     equw opcode_todo ; &26
@@ -520,7 +562,7 @@ endmacro
     equw opcode_todo ; &43
     equw opcode_todo ; &44
     equw opcode_todo ; &45
-    equw opcode_todo ; &46
+    equw opcode_handler_46
     equw opcode_todo ; &47
     equw opcode_todo ; &48
     equw opcode_todo ; &49
@@ -528,7 +570,7 @@ endmacro
     equw opcode_todo ; &4b
     equw opcode_todo ; &4c
     equw opcode_todo ; &4d
-    equw opcode_todo ; &4e
+    equw opcode_handler_4e
     equw opcode_todo ; &4f
     equw opcode_todo ; &50
     equw opcode_todo ; &51
@@ -536,7 +578,7 @@ endmacro
     equw opcode_todo ; &53
     equw opcode_todo ; &54
     equw opcode_todo ; &55
-    equw opcode_todo ; &56
+    equw opcode_handler_56
     equw opcode_todo ; &57
     equw opcode_todo ; &58
     equw opcode_todo ; &59
@@ -544,7 +586,7 @@ endmacro
     equw opcode_todo ; &5b
     equw opcode_todo ; &5c
     equw opcode_todo ; &5d
-    equw opcode_todo ; &5e
+    equw opcode_handler_5e
     equw opcode_todo ; &5f
     equw opcode_todo ; &60
     equw opcode_todo ; &61
@@ -552,7 +594,7 @@ endmacro
     equw opcode_todo ; &63
     equw opcode_todo ; &64
     equw opcode_todo ; &65
-    equw opcode_todo ; &66
+    equw opcode_handler_66
     equw opcode_todo ; &67
     equw opcode_todo ; &68
     equw opcode_todo ; &69
@@ -560,7 +602,7 @@ endmacro
     equw opcode_todo ; &6b
     equw opcode_todo ; &6c
     equw opcode_todo ; &6d
-    equw opcode_todo ; &6e
+    equw opcode_handler_6e
     equw opcode_todo ; &6f
     equw opcode_todo ; &70
     equw opcode_todo ; &71
@@ -576,7 +618,7 @@ endmacro
     equw opcode_todo ; &7b
     equw opcode_todo ; &7c
     equw opcode_todo ; &7d
-    equw opcode_todo ; &7e
+    equw opcode_handler_7e
     equw opcode_todo ; &7f
 .dispatch_table_high
     equw opcode_todo ; &80
