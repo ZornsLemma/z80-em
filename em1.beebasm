@@ -177,11 +177,25 @@ macro advance_pc_and_load
     inc z80_pch_physical
     lda z80_pch_physical
     cmp #&c0
-    bne not_new_pc_page
+    bne not_new_pc_bank
     jsr update_z80_pch_physical
 .not_new_pc_page
+.not_new_pc_bank
     lda (z80_pc_physical),y
 endmacro
+
+    ; TODO: Copy of code in zp dispatch loop, factor out using a macro?
+.new_pc_page_and_dispatch_loop_no_increment
+{
+    inc z80_pch_logical
+    inc z80_pch_physical
+    lda z80_pch_physical
+    cmp #&c0
+    bne not_new_pc_bank
+    jsr update_z80_pch_physical
+.not_new_pc_bank
+    jmp dispatch_loop_no_increment
+}
 
 ; TODO: DESCRIBE
 ; TODO: MAKE A MACRO?
@@ -268,6 +282,15 @@ macro inc_rr high_r, low_r
     jmp dispatch_loop
 endmacro
 
+macro dec_rr high_r, low_r
+    lda low_r
+    bne no_borrow
+    dec high_r
+.no_borrow
+    dec low_r
+    jmp dispatch_loop
+endmacro
+
 macro or_6502_a
     ora z80_a
     sta z80_a
@@ -279,6 +302,32 @@ macro or_6502_a
     ora parity_table,x
     sta z80_f
     jmp dispatch_loop
+endmacro
+
+macro jp
+    advance_pc_and_load
+    sta z80_pcl_tmp
+    advance_pc_and_load
+    sta z80_pch_logical
+    ldy z80_pcl_tmp
+    jmp update_z80_pch_physical_and_dispatch
+endmacro
+
+macro jp_flag_set hybrid_flag
+    ; TODO: We could probably write some if-else macro code to optimise detection of bits which we can test with the "bit" instruction rather than needing to do lda-then-and
+    lda z80_f
+    and #hybrid_flag
+    beq no_branch
+    jp
+.no_branch
+    tya
+    clc
+    adc #3
+    tay
+    bcs carry
+    jmp dispatch_loop_no_increment
+.carry
+    jmp new_pc_page_and_dispatch_loop_no_increment
 endmacro
 
 macro push_internal high, low, save_pc_bank_and_y
@@ -355,6 +404,10 @@ endmacro
 .opcode_handler_03
     inc_rr z80_b, z80_c
 
+; Instruction: dec bc
+.opcode_handler_0b
+    dec_rr z80_b, z80_c
+
 ; Instruction: ld c,*
 .opcode_handler_0e
     ld_r_8 z80_c
@@ -366,6 +419,10 @@ endmacro
 ; Instruction: inc de
 .opcode_handler_13
     inc_rr z80_d, z80_e
+
+; Instruction: dec de
+.opcode_handler_1b
+    dec_rr z80_d, z80_e
 
 ; Instruction: ld hl,**
 .opcode_handler_21
@@ -391,6 +448,10 @@ endmacro
     restore_pc_bank_and_y
     jmp dispatch_loop
 
+; Instruction: dec hl
+.opcode_handler_2b
+    dec_rr z80_h, z80_l
+
 ; Instruction: ld sp,**
 .opcode_handler_31
     ld_rr_16 z80_sp + 1, z80_sp
@@ -398,6 +459,10 @@ endmacro
 ; Instruction: inc sp
 .opcode_handler_33
     inc_rr z80_sp + 1, z80_sp
+
+; Instruction: dec sp
+.opcode_handler_3b
+    dec_rr z80_sp + 1, z80_sp
 
 ; Instruction: ld b,(hl)
 .opcode_handler_46
@@ -436,15 +501,10 @@ endmacro
 .opcode_handler_c1
     pop z80_b, z80_c
     jmp dispatch_loop
-    
+
 ; Instruction: jp **
 .opcode_handler_c3
-    advance_pc_and_load
-    sta z80_pcl_tmp
-    advance_pc_and_load
-    sta z80_pch_logical
-    ldy z80_pcl_tmp
-    jmp update_z80_pch_physical_and_dispatch
+    jp
 
 
     
@@ -459,6 +519,10 @@ endmacro
     pop_corrupt_pc_bank_and_y z80_pch_logical, z80_pcl_tmp
     ldy z80_pcl_tmp
     jmp update_z80_pch_physical_and_dispatch
+
+; Instruction: jp z,**
+.opcode_handler_ca
+    jp_flag_set hybrid_flag_z
 
 ; Instruction: call **
 .opcode_handler_cd
@@ -565,7 +629,7 @@ endmacro
     equw opcode_todo ; &08
     equw opcode_todo ; &09
     equw opcode_todo ; &0a
-    equw opcode_todo ; &0b
+    equw opcode_handler_0b
     equw opcode_todo ; &0c
     equw opcode_todo ; &0d
     equw opcode_handler_0e
@@ -581,7 +645,7 @@ endmacro
     equw opcode_todo ; &18
     equw opcode_todo ; &19
     equw opcode_todo ; &1a
-    equw opcode_todo ; &1b
+    equw opcode_handler_1b
     equw opcode_todo ; &1c
     equw opcode_todo ; &1d
     equw opcode_todo ; &1e
@@ -597,7 +661,7 @@ endmacro
     equw opcode_todo ; &28
     equw opcode_todo ; &29
     equw opcode_handler_2a
-    equw opcode_todo ; &2b
+    equw opcode_handler_2b
     equw opcode_todo ; &2c
     equw opcode_todo ; &2d
     equw opcode_todo ; &2e
@@ -613,7 +677,7 @@ endmacro
     equw opcode_todo ; &38
     equw opcode_todo ; &39
     equw opcode_todo ; &3a
-    equw opcode_todo ; &3b
+    equw opcode_handler_3b
     equw opcode_todo ; &3c
     equw opcode_todo ; &3d
     equw opcode_todo ; &3e
@@ -757,7 +821,7 @@ endmacro
     equw opcode_todo ; &c7
     equw opcode_todo ; &c8
     equw opcode_handler_c9
-    equw opcode_todo ; &ca
+    equw opcode_handler_ca
     equw opcode_todo ; &cb
     equw opcode_todo ; &cc
     equw opcode_handler_cd
