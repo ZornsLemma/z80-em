@@ -273,7 +273,7 @@ macro ld_rr_16 high_r, low_r
     jmp dispatch_loop
 endmacro
 
-macro ind_hl
+macro lda_ind_hl
     store_pc_bank_and_y
     lda z80_h
     jsr set_operand_ptr_using_a
@@ -282,8 +282,20 @@ macro ind_hl
     restore_pc_bank_and_y
 endmacro
 
+; TODO: Careful not to use this if there are cases where we could avoid the zp_tmp use - in some cases we can't, but there may be some where we can
+macro sta_ind_hl
+    sta zp_tmp
+    store_pc_bank_and_y
+    lda z80_h
+    jsr set_operand_ptr_using_a
+    ldy z80_l
+    lda zp_tmp
+    sta (operand_ptr),y
+    restore_pc_bank_and_y
+endmacro
+
 macro ld_r_ind_hl r
-    ind_hl
+    lda_ind_hl
     sta r
     jmp dispatch_loop
 endmacro
@@ -549,7 +561,9 @@ endmacro
 
 ; Instruction: ld (hl),*
 .opcode_handler_36
-    brk
+    advance_pc_and_load
+    sta_ind_hl
+    jmp dispatch_loop
 
 ; Instruction: add hl,sp
 .opcode_handler_39
@@ -571,9 +585,17 @@ endmacro
 .opcode_handler_4f
     ld_r_s z80_c, z80_a
 
+; Instruction: ld d,h
+.opcode_handler_54
+    ld_r_s z80_d, z80_h
+
 ; Instruction: ld d,(hl)
 .opcode_handler_56
     ld_r_ind_hl z80_d
+
+; Instruction: ld e,l
+.opcode_handler_5d
+    ld_r_s z80_e, z80_l
 
 ; Instruction: ld e,(hl)
 .opcode_handler_5e
@@ -605,7 +627,7 @@ endmacro
 
 ; Instruction: or (hl)
 .opcode_handler_b6
-    ind_hl
+    lda_ind_hl
     or_6502_a
 
 ; Instruction: pop bc
@@ -811,7 +833,7 @@ endmacro
     equw opcode_todo ; &51
     equw opcode_todo ; &52
     equw opcode_todo ; &53
-    equw opcode_todo ; &54
+    equw opcode_handler_54
     equw opcode_todo ; &55
     equw opcode_handler_56
     equw opcode_todo ; &57
@@ -820,7 +842,7 @@ endmacro
     equw opcode_todo ; &5a
     equw opcode_todo ; &5b
     equw opcode_todo ; &5c
-    equw opcode_todo ; &5d
+    equw opcode_handler_5d
     equw opcode_handler_5e
     equw opcode_handler_5f
     equw opcode_todo ; &60
