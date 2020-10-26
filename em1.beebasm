@@ -443,14 +443,19 @@ endmacro
 .opcode_handler_23
     inc_rr z80_h, z80_l
 
-; Instruction: ld hl,(**)
-.opcode_handler_2a
+; TODO: This may be useful in places which currently have this code written out inline
+macro set_operand_ptr_using_imm_16
     advance_pc_and_load
     sta zp_tmp
     advance_pc_and_load
     store_pc_bank_and_y
     jsr set_operand_ptr_using_a
     ldy zp_tmp
+endmacro
+
+; Instruction: ld hl,(**)
+.opcode_handler_2a
+    set_operand_ptr_using_imm_16
     lda (operand_ptr),y
     sta z80_l
     jsr bump_operand_ptr_y
@@ -466,6 +471,14 @@ endmacro
 ; Instruction: ld sp,**
 .opcode_handler_31
     ld_rr_16 z80_sp + 1, z80_sp
+
+; Instruction: ld (**),a
+.opcode_handler_32
+    set_operand_ptr_using_imm_16
+    lda z80_a
+    sta (operand_ptr),y
+    restore_pc_bank_and_y
+    jmp dispatch_loop
 
 ; Instruction: inc sp
 .opcode_handler_33
@@ -689,7 +702,7 @@ endmacro
     equw opcode_todo ; &2f
     equw opcode_todo ; &30
     equw opcode_handler_31
-    equw opcode_todo ; &32
+    equw opcode_handler_32
     equw opcode_handler_33
     equw opcode_todo ; &34
     equw opcode_todo ; &35
