@@ -296,6 +296,10 @@ macro pop high, low
     pop_internal high, low, TRUE
 endmacro
 
+; Instruction: ld bc,**
+.opcode_handler_01
+    ld_rr_16 z80_b, z80_c
+
 ; Instruction: ld c,*
 .opcode_handler_0e
     ld_r_8 z80_c
@@ -306,7 +310,7 @@ endmacro
 
 ; Instruction: ld hl,**
 .opcode_handler_21
-    brk
+    ld_rr_16 z80_h, z80_l
 
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
@@ -323,6 +327,10 @@ endmacro
     sta z80_h
     restore_pc_bank_and_y
     jmp dispatch_loop
+
+; Instruction: ld sp,**
+.opcode_handler_31
+    ld_rr_16 z80_sp + 1, z80_sp
 
 ; Instruction: pop bc
 .opcode_handler_c1
@@ -443,7 +451,7 @@ endmacro
     align &100
 .dispatch_table_low
     equw opcode_todo ; &00
-    equw opcode_todo ; &01
+    equw opcode_handler_01
     equw opcode_todo ; &02
     equw opcode_todo ; &03
     equw opcode_todo ; &04
@@ -491,7 +499,7 @@ endmacro
     equw opcode_todo ; &2e
     equw opcode_todo ; &2f
     equw opcode_todo ; &30
-    equw opcode_todo ; &31
+    equw opcode_handler_31
     equw opcode_todo ; &32
     equw opcode_todo ; &33
     equw opcode_todo ; &34
