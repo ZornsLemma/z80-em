@@ -6,6 +6,10 @@ romsel_copy = &f4
 
 osasci = &ffe3
 
+macro and_not n
+    and #not(n) and &ff
+endmacro
+
 ; TODO: I'm putting paging in a macro partly in case there's a way I can disable interrupts most of the time and then get away with not having to update romsel_copy
 macro page_in_bank_a
     sta romsel_copy
@@ -104,10 +108,12 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 hybrid_flag_s = 1 << 7 ; 6502 N flag
 hybrid_flag_n = 1 << 6
 hybrid_flag_h = 1 << 4
+hybrid_flag_p = 1 << 2
 hybrid_flag_z = 1 << 1 ; 6502 Z flag
 hybrid_flag_c = 1 << 0 ; 6502 C flag
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
 hybrid_flag_hnc = hybrid_flag_h or hybrid_flag_n or hybrid_flag_c
+hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
 
     org &e00
     guard &8000
@@ -453,6 +459,10 @@ endmacro
 .opcode_handler_03
     inc_rr z80_b, z80_c
 
+; Instruction: ld b,*
+.opcode_handler_06
+    brk
+
 macro add_rr_ss r_high, r_low, s_high, s_low
     ; Note that r and s may be the same, so we can't assume s_high is unchanged
     ; when we come to determine H. There's no harm in doing this step first
@@ -464,12 +474,13 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     lda r_low
     adc s_low
     sta r_low
+    php
     lda r_high
     tax
     adc s_high
     sta r_high
     lda z80_f
-    and #not(hybrid_flag_hnc) and &ff
+    and_not hybrid_flag_hnc
     bcc no_carry
     ora #hybrid_flag_c
 .no_carry
@@ -733,13 +744,47 @@ endmacro
 
 ; Instruction: ld sp,hl
 .opcode_handler_f9
-    ld_r_s_fragment z80_sp  ,z80_l
-    ld_r_s          z80_sp+1,z80_h
+    ld_r_s_fragment z80_sp    ,z80_l
+    ld_r_s          z80_sp + 1,z80_h
     jmp dispatch_loop
 
 ; Instruction: ldir
 .opcode_handler_ed_b0
-    brk
+{
+    store_pc_bank_and_y
+.loop
+    lda z80_h
+    jsr set_operand_ptr_using_a
+    ldy z80_l
+    lda (operand_ptr),y
+    sta zp_tmp
+    lda z80_d
+    jsr set_operand_ptr_using_a
+    ldy z80_e
+    lda zp_tmp
+    sta (operand_ptr),y
+    inc z80_e
+    bne no_carry_de
+    inc z80_d
+.no_carry_de
+    inc z80_l
+    bne no_carry_hl
+    inc z80_h
+.no_carry_hl
+    lda z80_c
+    bne no_borrow_bc
+    dec z80_b
+.no_borrow_bc
+    dec z80_c
+    bne loop
+    lda z80_b
+    bne loop
+    lda z80_f
+    and_not hybrid_flag_hpn
+    sta z80_f
+    restore_pc_bank_and_y
+    jmp dispatch_loop
+}
 
 ; TODO: Temporary hack to emulate bdos functions necessary for test code
 .bdos_emulation
@@ -772,7 +817,7 @@ endmacro
     equw opcode_handler_03
     equw opcode_todo ; &04
     equw opcode_todo ; &05
-    equw opcode_todo ; &06
+    equw opcode_handler_06
     equw opcode_todo ; &07
     equw opcode_todo ; &08
     equw opcode_handler_09
