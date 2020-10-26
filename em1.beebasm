@@ -251,6 +251,17 @@ macro ld_r_8 r
     jmp dispatch_loop
 endmacro
 
+; TODO: MOVE MACRO TO TOP
+macro ld_r_s_fragment r, s
+    lda s
+    sta r
+endmacro
+
+macro ld_r_s r, s
+    ld_r_s_fragment r, s
+    jmp dispatch_loop
+endmacro
+
 macro ld_rr_16 high_r, low_r
     advance_pc_and_load
     sta low_r
@@ -472,6 +483,10 @@ endmacro
 .opcode_handler_4e
     ld_r_ind_hl z80_c
 
+; Instruction: ld c,a
+.opcode_handler_4f
+    ld_r_s z80_c, z80_a
+
 ; Instruction: ld d,(hl)
 .opcode_handler_56
     ld_r_ind_hl z80_d
@@ -479,6 +494,10 @@ endmacro
 ; Instruction: ld e,(hl)
 .opcode_handler_5e
     ld_r_ind_hl z80_e
+
+; Instruction: ld e,a
+.opcode_handler_5f
+    ld_r_s z80_e, z80_a
 
 ; Instruction: ld h,(hl)
 .opcode_handler_66
@@ -488,9 +507,17 @@ endmacro
 .opcode_handler_6e
     ld_r_ind_hl z80_l
 
+; Instruction: ld l,a
+.opcode_handler_6f
+    ld_r_s z80_l, z80_a
+
 ; Instruction: ld a,(hl)
 .opcode_handler_7e
     ld_r_ind_hl z80_a
+
+; Instruction: ld a,a
+.opcode_handler_7f
+    jmp dispatch_loop
 
 ; Instruction: or (hl)
 .opcode_handler_b6
@@ -544,12 +571,6 @@ endmacro
     jmp update_z80_pch_physical_and_dispatch
 }
 
-; TODO: MOVE MACRO TO TOP
-macro ld_r_s r, s
-    lda s
-    sta r
-endmacro
-
 ; Instruction: pop de
 .opcode_handler_d1
     pop z80_d, z80_e
@@ -588,8 +609,8 @@ endmacro
 
 ; Instruction: ld sp,hl
 .opcode_handler_f9
-    ld_r_s z80_sp  ,z80_l
-    ld_r_s z80_sp+1,z80_h
+    ld_r_s_fragment z80_sp  ,z80_l
+    ld_r_s          z80_sp+1,z80_h
     jmp dispatch_loop
 
 
@@ -697,7 +718,7 @@ endmacro
     equw opcode_todo ; &4c
     equw opcode_todo ; &4d
     equw opcode_handler_4e
-    equw opcode_todo ; &4f
+    equw opcode_handler_4f
     equw opcode_todo ; &50
     equw opcode_todo ; &51
     equw opcode_todo ; &52
@@ -713,7 +734,7 @@ endmacro
     equw opcode_todo ; &5c
     equw opcode_todo ; &5d
     equw opcode_handler_5e
-    equw opcode_todo ; &5f
+    equw opcode_handler_5f
     equw opcode_todo ; &60
     equw opcode_todo ; &61
     equw opcode_todo ; &62
@@ -729,7 +750,7 @@ endmacro
     equw opcode_todo ; &6c
     equw opcode_todo ; &6d
     equw opcode_handler_6e
-    equw opcode_todo ; &6f
+    equw opcode_handler_6f
     equw opcode_todo ; &70
     equw opcode_todo ; &71
     equw opcode_todo ; &72
@@ -745,7 +766,7 @@ endmacro
     equw opcode_todo ; &7c
     equw opcode_todo ; &7d
     equw opcode_handler_7e
-    equw opcode_todo ; &7f
+    equw opcode_handler_7f
 .dispatch_table_high
     equw opcode_todo ; &80
     equw opcode_todo ; &81
