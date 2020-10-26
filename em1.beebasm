@@ -230,41 +230,6 @@ macro ld_rr_16 high_r, low_r
     jmp dispatch_loop
 endmacro
 
-; Instruction: ld c,*
-.opcode_handler_0e
-    ld_r_8 z80_c
-
-; Instruction: ld de,**
-.opcode_handler_11
-    ld_rr_16 z80_d, z80_e
-
-; Instruction: ld hl,(**)
-.opcode_handler_2a
-    advance_pc_and_load
-    sta zp_tmp
-    advance_pc_and_load
-    store_pc_bank_and_y
-    jsr set_operand_ptr_using_a
-    ldy zp_tmp
-    lda (operand_ptr),y
-    sta z80_l
-    jsr bump_operand_ptr_y
-    lda (operand_ptr),y
-    sta z80_h
-    restore_pc_bank_and_y
-    jmp dispatch_loop
-
-    
-; Instruction: jp **
-.opcode_handler_c3
-    advance_pc_and_load
-    sta z80_pcl_tmp
-    advance_pc_and_load
-    sta z80_pch_logical
-    ldy z80_pcl_tmp
-    jmp update_z80_pch_physical_and_dispatch
-
-
 macro push_internal high, low, save_pc_bank_and_y
 if save_pc_bank_and_y
     store_pc_bank_and_y
@@ -294,7 +259,7 @@ macro push_corrupt_pc_bank_and_y high, low
     push_internal high, low, FALSE
 endmacro
 
-macro push high,low
+macro push high, low
     push_internal high, low, TRUE
 endmacro
 
@@ -326,6 +291,54 @@ endmacro
 macro pop_corrupt_pc_bank_and_y high, low
     pop_internal high, low, FALSE
 endmacro
+
+macro pop high, low
+    pop_internal high, low, TRUE
+endmacro
+
+; Instruction: ld c,*
+.opcode_handler_0e
+    ld_r_8 z80_c
+
+; Instruction: ld de,**
+.opcode_handler_11
+    ld_rr_16 z80_d, z80_e
+
+; Instruction: ld hl,**
+.opcode_handler_21
+    brk
+
+; Instruction: ld hl,(**)
+.opcode_handler_2a
+    advance_pc_and_load
+    sta zp_tmp
+    advance_pc_and_load
+    store_pc_bank_and_y
+    jsr set_operand_ptr_using_a
+    ldy zp_tmp
+    lda (operand_ptr),y
+    sta z80_l
+    jsr bump_operand_ptr_y
+    lda (operand_ptr),y
+    sta z80_h
+    restore_pc_bank_and_y
+    jmp dispatch_loop
+
+; Instruction: pop bc
+.opcode_handler_c1
+    pop z80_b, z80_c
+    jmp dispatch_loop
+    
+; Instruction: jp **
+.opcode_handler_c3
+    advance_pc_and_load
+    sta z80_pcl_tmp
+    advance_pc_and_load
+    sta z80_pch_logical
+    ldy z80_pcl_tmp
+    jmp update_z80_pch_physical_and_dispatch
+
+
     
 
 ; Instruction: push bc
@@ -365,14 +378,30 @@ macro ld_r_s r, s
     sta r
 endmacro
 
+; Instruction: pop de
+.opcode_handler_d1
+    pop z80_d, z80_e
+    jmp dispatch_loop
+
 ; Instruction: push de
 .opcode_handler_d5
     push z80_d, z80_e
     jmp dispatch_loop
 
+; Instruction: pop hl
+.opcode_handler_e1
+    pop z80_h, z80_l
+    jmp dispatch_loop
+
 ; Instruction: push hl
 .opcode_handler_e5
     push z80_h, z80_l
+    jmp dispatch_loop
+
+; Instruction: pop af
+.opcode_handler_f1
+    ; TODO: I don't have a flags implementation yet, this will just pop junk
+    pop z80_a, z80_f
     jmp dispatch_loop
 
 ; Instruction: push af
@@ -446,7 +475,7 @@ endmacro
     equw opcode_todo ; &1e
     equw opcode_todo ; &1f
     equw opcode_todo ; &20
-    equw opcode_todo ; &21
+    equw opcode_handler_21
     equw opcode_todo ; &22
     equw opcode_todo ; &23
     equw opcode_todo ; &24
@@ -607,7 +636,7 @@ endmacro
     equw opcode_todo ; &be
     equw opcode_todo ; &bf
     equw opcode_todo ; &c0
-    equw opcode_todo ; &c1
+    equw opcode_handler_c1
     equw opcode_todo ; &c2
     equw opcode_handler_c3
     equw opcode_todo ; &c4
@@ -623,7 +652,7 @@ endmacro
     equw opcode_todo ; &ce
     equw opcode_todo ; &cf
     equw opcode_todo ; &d0
-    equw opcode_todo ; &d1
+    equw opcode_handler_d1
     equw opcode_todo ; &d2
     equw opcode_todo ; &d3
     equw opcode_todo ; &d4
@@ -639,7 +668,7 @@ endmacro
     equw opcode_todo ; &de
     equw opcode_todo ; &df
     equw opcode_todo ; &e0
-    equw opcode_todo ; &e1
+    equw opcode_handler_e1
     equw opcode_todo ; &e2
     equw opcode_todo ; &e3
     equw opcode_todo ; &e4
@@ -655,7 +684,7 @@ endmacro
     equw opcode_todo ; &ee
     equw opcode_todo ; &ef
     equw opcode_todo ; &f0
-    equw opcode_todo ; &f1
+    equw opcode_handler_f1
     equw opcode_todo ; &f2
     equw opcode_todo ; &f3
     equw opcode_todo ; &f4
