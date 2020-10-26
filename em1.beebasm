@@ -4,6 +4,8 @@
 romsel = &fe30
 romsel_copy = &f4
 
+osasci = &ffe3
+
 ; TODO: I'm putting paging in a macro partly in case there's a way I can disable interrupts most of the time and then get away with not having to update romsel_copy
 macro page_in_bank_a
     sta romsel_copy
@@ -40,6 +42,16 @@ endmacro
 .^dispatch_loop_no_increment
 .^lda_z80_pc_physical_abs_y
     lda &ff00,y
+; TODO: START TEMP HACK TO DETECT EXECUTING AT $0005
+    sta zp_tmp
+    cpy #5
+    bne not_5
+    lda z80_pch_logical
+    bne not_5
+    jmp bdos_emulation
+.not_5
+    lda zp_tmp
+; TODO: END TEMP HACK
     asl a
     tax
     bcs top_bit_set_opcode
@@ -286,10 +298,46 @@ macro push high,low
     push_internal high, low, TRUE
 endmacro
 
+macro pop_internal high, low, save_pc_bank_and_y
+if save_pc_bank_and_y
+    store_pc_bank_and_y
+endif
+    lda z80_sp + 1
+    jsr set_operand_ptr_using_a
+    ldy z80_sp
+    ; TODO: Which order do the bytes get popped off the stack? This order seems logical but may not be correct.
+    lda (operand_ptr),y
+    sta low
+    jsr bump_operand_ptr_y
+    lda (operand_ptr),y
+    sta high
+    clc
+    lda z80_sp
+    adc #2
+    sta z80_sp
+    bcc no_carry
+    inc z80_sp + 1
+.no_carry
+if save_pc_bank_and_y
+    restore_pc_bank_and_y
+endif
+endmacro
+
+macro pop_corrupt_pc_bank_and_y high, low
+    pop_internal high, low, FALSE
+endmacro
+    
+
 ; Instruction: push bc
 .opcode_handler_c5
     push z80_b, z80_c
     jmp dispatch_loop
+
+; Instruction: ret
+.opcode_handler_c9
+    pop_corrupt_pc_bank_and_y z80_pch_logical, z80_pcl_tmp
+    ldy z80_pcl_tmp
+    jmp update_z80_pch_physical_and_dispatch
 
 ; Instruction: call **
 .opcode_handler_cd
@@ -338,6 +386,29 @@ endmacro
     ld_r_s z80_sp  ,z80_l
     ld_r_s z80_sp+1,z80_h
     jmp dispatch_loop
+
+
+; TODO: Temporary hack to emulate bdos functions necessary for test code
+.bdos_emulation
+    lda z80_c
+    cmp #9
+    beq bdos_emulation_writestr
+    brk
+.bdos_emulation_writestr
+{
+    lda z80_d
+    jsr set_operand_ptr_using_a
+    ldy z80_e
+.loop
+    lda (operand_ptr),y
+    cmp #'$'
+    beq done
+    jsr osasci
+    jsr bump_operand_ptr_y
+    jmp loop
+.done
+    jmp opcode_handler_c9
+}
 
 
     align &100
@@ -544,7 +615,7 @@ endmacro
     equw opcode_todo ; &c6
     equw opcode_todo ; &c7
     equw opcode_todo ; &c8
-    equw opcode_todo ; &c9
+    equw opcode_handler_c9
     equw opcode_todo ; &ca
     equw opcode_todo ; &cb
     equw opcode_todo ; &cc
