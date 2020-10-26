@@ -80,7 +80,7 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_pc_physical_bank_tmp equb 0 ; normally paged in, just temporary storage
 .z80_pcl_tmp equb 0 ; normally in Y, just temporary storage
 .z80_a equb 0
-.z80_f equb 0 ; TODO: Do we want this?
+.z80_f equb 0
 .z80_b equb 0
 .z80_c equb 0
 .z80_d equb 0
@@ -91,7 +91,21 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .operand_ptr equw 0 ; low byte always 0
 .zp_tmp equw 0 ; temporary workspace
 
-    
+; The 6502 N, Z and C flags correspond closely to the Z80 S, Z and C flags,
+; although they live at different bit positions in the flags register. To track
+; the Z80 flags as efficiently as possible, z80_f holds "hybrid flags" - these
+; are the Z80 flags but rearranged to use the 6502 bit positions. These need to
+; be converted to use the correct bit positions when exposed to code running on
+; the emulated Z80.
+;
+;        b76543210
+; Hybrid: SN H PZC
+; Z80:    SZ H PNC
+hybrid_flag_s = 1 << 7 ; 6502 N flag
+hybrid_flag_z = 1 << 1 ; 6502 Z flag
+hybrid_flag_c = 1 << 0 ; 6502 C flag
+hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
+
     org &e00
     guard &8000
 .start
@@ -210,6 +224,7 @@ macro store_pc_bank_and_y
     sty z80_pc_physical_bank_tmp
 endmacro
 
+; This preserves A and X.
 macro restore_pc_bank_and_y
     ldy z80_pc_physical_bank_tmp
     page_in_bank_y
@@ -230,14 +245,18 @@ macro ld_rr_16 high_r, low_r
     jmp dispatch_loop
 endmacro
 
-macro ld_r_ind_hl r
+macro ind_hl
     store_pc_bank_and_y
     lda z80_h
     jsr set_operand_ptr_using_a
     ldy z80_l
     lda (operand_ptr),y
-    sta r
     restore_pc_bank_and_y
+endmacro
+
+macro ld_r_ind_hl r
+    ind_hl
+    sta r
     jmp dispatch_loop
 endmacro
 
@@ -246,6 +265,19 @@ macro inc_rr high_r, low_r
     bne no_carry
     inc high_r
 .no_carry
+    jmp dispatch_loop
+endmacro
+
+macro or_6502_a
+    ora z80_a
+    sta z80_a
+    tax
+    ; Clear H, N, C and set S, Z, P according to result
+    php
+    pla
+    and #hybrid_flag_sz
+    ora parity_table,x
+    sta z80_f
     jmp dispatch_loop
 endmacro
 
@@ -395,6 +427,11 @@ endmacro
 .opcode_handler_7e
     ld_r_ind_hl z80_a
 
+; Instruction: or (hl)
+.opcode_handler_b6
+    ind_hl
+    or_6502_a
+
 ; Instruction: pop bc
 .opcode_handler_c1
     pop z80_b, z80_c
@@ -471,14 +508,18 @@ endmacro
 
 ; Instruction: pop af
 .opcode_handler_f1
-    ; TODO: I don't have a flags implementation yet, this will just pop junk
-    pop z80_a, z80_f
+    pop z80_a, zp_tmp
+    ldx zp_tmp
+    lda flag_permutation_table,x
+    sta z80_f
     jmp dispatch_loop
 
 ; Instruction: push af
 .opcode_handler_f5
-    ; TODO: I don't have a flags implementation yet, this will just push junk
-    push z80_a, z80_f
+    ldx z80_f
+    lda flag_permutation_table,x
+    sta zp_tmp
+    push z80_a, zp_tmp
     jmp dispatch_loop
 
 ; Instruction: ld sp,hl
@@ -696,7 +737,7 @@ endmacro
     equw opcode_todo ; &b3
     equw opcode_todo ; &b4
     equw opcode_todo ; &b5
-    equw opcode_todo ; &b6
+    equw opcode_handler_b6
     equw opcode_todo ; &b7
     equw opcode_todo ; &b8
     equw opcode_todo ; &b9
@@ -770,6 +811,9 @@ endmacro
     equw opcode_todo ; &fd
     equw opcode_todo ; &fe
     equw opcode_todo ; &ff
+
+    align &100
+    include "tables.beebasm"
 
     align &100
 .swr_bank_table
