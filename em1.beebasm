@@ -329,6 +329,7 @@ macro and_6502_a
     sta z80_a
     tax
     ; Clear N, C, set H and set S, Z, P according to result
+    ; TODO: Probably elsewhere but we could probably replace a lot of this with table lookup - a table lookup can determine S and Z without needing to use the 6502 flags, this then handles S, Z and P in parallel
     php
     pla
     and #hybrid_flag_sz
@@ -503,6 +504,27 @@ macro multibyte_dispatch low_table, high_table
     jmp (high_table,x)
 endmacro
 
+macro dec_r r
+    dec r
+    lda z80_f
+    and #hybrid_flag_c
+    ldx r
+    ora dec_flag_table,x
+    sta z80_f
+    jmp dispatch_loop
+endmacro
+
+macro inc_r r
+    inc r
+    lda z80_f
+    and #hybrid_flag_c
+    ldx r
+    ora inc_flag_table,x
+    sta z80_f
+    jmp dispatch_loop
+endmacro
+
+
 ; Instruction: ld bc,**
 .opcode_handler_01
     ld_rr_16 z80_b, z80_c
@@ -513,8 +535,7 @@ endmacro
 
 ; Instruction: dec b
 .opcode_handler_05
-    ; SFTODO MAKE SURE TO SET FLAGS CORRECTLY
-    brk
+    dec_r z80_b
 
 ; Instruction: ld b,*
 .opcode_handler_06
@@ -581,6 +602,10 @@ endmacro
 .opcode_handler_0e
     ld_r_8 z80_c
 
+; Instruction: rrca
+.opcode_handler_0f
+    brk
+
 ; Instruction: ld de,**
 .opcode_handler_11
     ld_rr_16 z80_d, z80_e
@@ -588,6 +613,10 @@ endmacro
 ; Instruction: inc de
 .opcode_handler_13
     inc_rr z80_d, z80_e
+
+; Instruction: inc d
+.opcode_handler_14
+    inc_r z80_d
 
 ; Instruction: ld d,*
 .opcode_handler_16
@@ -716,6 +745,10 @@ endmacro
 .opcode_handler_79
     ld_r_s z80_a, z80_c
 
+; Instruction: ld a,d
+.opcode_handler_7a
+    ld_r_s z80_a, z80_d
+
 ; Instruction: ld a,e
 .opcode_handler_7b
     ld_r_s z80_a, z80_e
@@ -805,6 +838,11 @@ endmacro
 .opcode_handler_e5
     push z80_h, z80_l
     jmp dispatch_loop
+
+; Instruction: and *
+.opcode_handler_e6
+    advance_pc_and_load
+    and_6502_a
 
 ; Instruction: ex de,hl
 .opcode_handler_eb
@@ -919,12 +957,12 @@ endmacro
     equw opcode_todo ; &0c
     equw opcode_todo ; &0d
     equw opcode_handler_0e
-    equw opcode_todo ; &0f
+    equw opcode_handler_0f
     equw opcode_todo ; &10
     equw opcode_handler_11
     equw opcode_todo ; &12
     equw opcode_handler_13
-    equw opcode_todo ; &14
+    equw opcode_handler_14
     equw opcode_todo ; &15
     equw opcode_handler_16
     equw opcode_todo ; &17
@@ -1026,7 +1064,7 @@ endmacro
     equw opcode_todo ; &77
     equw opcode_todo ; &78
     equw opcode_handler_79
-    equw opcode_todo ; &7a
+    equw opcode_handler_7a
     equw opcode_handler_7b
     equw opcode_todo ; &7c
     equw opcode_todo ; &7d
@@ -1135,7 +1173,7 @@ endmacro
     equw opcode_todo ; &e3
     equw opcode_todo ; &e4
     equw opcode_handler_e5
-    equw opcode_todo ; &e6
+    equw opcode_handler_e6
     equw opcode_todo ; &e7
     equw opcode_todo ; &e8
     equw opcode_todo ; &e9
