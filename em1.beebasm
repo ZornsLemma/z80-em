@@ -974,7 +974,15 @@ endmacro
 
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
-    brk
+    set_operand_ptr_using_imm_16
+    ; TODO: What order do the bytes get stored in?
+    lda z80_sp
+    sta (operand_ptr),y
+    jsr bump_operand_ptr_y
+    lda z80_sp + 1
+    sta (operand_ptr),y
+    restore_pc_bank_and_y
+    jmp dispatch_loop
 
 ; Instruction: ldir
 .opcode_handler_ed_b0
