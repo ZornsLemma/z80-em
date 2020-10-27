@@ -290,7 +290,8 @@ macro lda_ind_hl
 endmacro
 
 ; TODO: Careful not to use this if there are cases where we could avoid the zp_tmp use - in some cases we can't, but there may be some where we can
-macro sta_ind_hl
+; TODO: If all uses of this macro then do jmp dispatch_loop can rewrite this as sta zp_tmp:ld_ind_hl_r zp_tmp
+macro sta_ind_hl_via_tmp_fragment
     sta zp_tmp
     store_pc_bank_and_y
     lda z80_h
@@ -299,6 +300,17 @@ macro sta_ind_hl
     lda zp_tmp
     sta (operand_ptr),y
     restore_pc_bank_and_y
+endmacro
+
+macro ld_ind_hl_r r
+    store_pc_bank_and_y
+    lda z80_h
+    jsr set_operand_ptr_using_a
+    ldy z80_l
+    lda r
+    sta (operand_ptr),y
+    restore_pc_bank_and_y
+    jmp dispatch_loop
 endmacro
 
 macro ld_r_ind_hl r
@@ -604,7 +616,19 @@ endmacro
 
 ; Instruction: rrca
 .opcode_handler_0f
-    brk
+    ; TODO: An 8-bit rotate could be done using a lookup table
+    lda z80_a
+    lsr a
+    bcc top_bit_0
+    ora #&80
+.top_bit_0
+    sta z80_a
+    lda z80_f
+    and_not hybrid_flag_hnc
+    assert hybrid_flag_c == 1
+    adc #0
+    sta z80_f
+    jmp dispatch_loop
 
 ; Instruction: ld de,**
 .opcode_handler_11
@@ -637,6 +661,10 @@ endmacro
 ; Instruction: inc hl
 .opcode_handler_23
     inc_rr z80_h, z80_l
+
+; Instruction: ld h,*
+.opcode_handler_26
+    ld_r_8 z80_h
 
 ; TODO: This may be useful in places which currently have this code written out inline
 macro set_operand_ptr_using_imm_16
@@ -686,20 +714,40 @@ endmacro
 ; Instruction: ld (hl),*
 .opcode_handler_36
     advance_pc_and_load
-    sta_ind_hl
+    sta_ind_hl_via_tmp_fragment
     jmp dispatch_loop
 
 ; Instruction: add hl,sp
 .opcode_handler_39
     add_rr_ss z80_h, z80_l, z80_sp + 1, z80_sp
 
+; Instruction: ld a,(**)
+.opcode_handler_3a
+    set_operand_ptr_using_imm_16
+    lda (operand_ptr),y
+    sta z80_a
+    restore_pc_bank_and_y
+    jmp dispatch_loop
+
 ; Instruction: dec sp
 .opcode_handler_3b
     dec_rr z80_sp + 1, z80_sp
 
+; Instruction: inc a
+.opcode_handler_3c
+    inc_r z80_a
+
+; Instruction: ld a,*
+.opcode_handler_3e
+    ld_r_8 z80_a
+
 ; Instruction: ld b,(hl)
 .opcode_handler_46
     ld_r_ind_hl z80_b
+
+; Instruction: ld b,a
+.opcode_handler_47
+    ld_r_s z80_b, z80_a
 
 ; Instruction: ld c,(hl)
 .opcode_handler_4e
@@ -740,6 +788,10 @@ endmacro
 ; Instruction: ld l,a
 .opcode_handler_6f
     ld_r_s z80_l, z80_a
+
+; Instruction: ld (hl),a
+.opcode_handler_77
+    ld_ind_hl_r z80_a
 
 ; Instruction: ld a,c
 .opcode_handler_79
@@ -980,7 +1032,7 @@ endmacro
     equw opcode_handler_23
     equw opcode_todo ; &24
     equw opcode_todo ; &25
-    equw opcode_todo ; &26
+    equw opcode_handler_26
     equw opcode_todo ; &27
     equw opcode_todo ; &28
     equw opcode_handler_29
@@ -1000,11 +1052,11 @@ endmacro
     equw opcode_todo ; &37
     equw opcode_todo ; &38
     equw opcode_handler_39
-    equw opcode_todo ; &3a
+    equw opcode_handler_3a
     equw opcode_handler_3b
-    equw opcode_todo ; &3c
+    equw opcode_handler_3c
     equw opcode_todo ; &3d
-    equw opcode_todo ; &3e
+    equw opcode_handler_3e
     equw opcode_todo ; &3f
     equw opcode_todo ; &40
     equw opcode_todo ; &41
@@ -1013,7 +1065,7 @@ endmacro
     equw opcode_todo ; &44
     equw opcode_todo ; &45
     equw opcode_handler_46
-    equw opcode_todo ; &47
+    equw opcode_handler_47
     equw opcode_todo ; &48
     equw opcode_todo ; &49
     equw opcode_todo ; &4a
@@ -1061,7 +1113,7 @@ endmacro
     equw opcode_todo ; &74
     equw opcode_todo ; &75
     equw opcode_todo ; &76
-    equw opcode_todo ; &77
+    equw opcode_handler_77
     equw opcode_todo ; &78
     equw opcode_handler_79
     equw opcode_handler_7a
