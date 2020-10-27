@@ -427,6 +427,54 @@ macro jp_flag_clear hybrid_flag
     jp_flag_internal hybrid_flag, FALSE
 endmacro
 
+macro call
+    advance_pc_and_load
+    sta z80_pcl_tmp
+    advance_pc_and_load
+    sta zp_tmp
+    ; Push the address of the next instruction onto the stack.
+    iny
+    bne no_carry
+    inc z80_pch_logical
+.no_carry
+    sty zp_tmp + 1
+    push_corrupt_pc_bank_and_y z80_pch_logical, zp_tmp + 1
+    lda zp_tmp
+    sta z80_pch_logical
+    ldy z80_pcl_tmp
+    jmp update_z80_pch_physical_and_dispatch
+endmacro
+
+macro call_flag_internal hybrid_flag, branch_if_set
+    ; TODO: We could probably write some if-else macro code to optimise detection of bits which we can test by implicit-set-on-lda z80_f - this could potentially be shared with jp_flag_internal
+    lda z80_f
+    and #hybrid_flag
+if branch_if_set
+    beq no_branch
+else
+    bne no_branch
+endif
+    call
+.no_branch
+    ; TODO: Following is duplicate of code in jp_flag_internal
+    tya
+    clc
+    adc #3
+    tay
+    bcs carry
+    jmp dispatch_loop_no_increment
+.carry
+    jmp new_pc_page_and_dispatch_loop_no_increment
+endmacro
+
+macro call_flag_set hybrid_flag
+    call_flag_internal hybrid_flag, TRUE
+endmacro
+
+macro call_flag_clear hybrid_flag
+    call_flag_internal hybrid_flag, FALSE
+endmacro
+
 macro push_internal high, low, save_pc_bank_and_y
 if save_pc_bank_and_y
     store_pc_bank_and_y
@@ -836,6 +884,10 @@ endmacro
 .opcode_handler_c3
     jp
 
+; Instruction: call nz,**
+.opcode_handler_c4
+    call_flag_clear hybrid_flag_z
+
 ; Instruction: push bc
 .opcode_handler_c5
     push z80_b, z80_c
@@ -853,23 +905,7 @@ endmacro
 
 ; Instruction: call **
 .opcode_handler_cd
-{
-    advance_pc_and_load
-    sta z80_pcl_tmp
-    advance_pc_and_load
-    sta zp_tmp
-    ; Push the address of the next instruction onto the stack.
-    iny
-    bne no_carry
-    inc z80_pch_logical
-.no_carry
-    sty zp_tmp + 1
-    push_corrupt_pc_bank_and_y z80_pch_logical, zp_tmp + 1
-    lda zp_tmp
-    sta z80_pch_logical
-    ldy z80_pcl_tmp
-    jmp update_z80_pch_physical_and_dispatch
-}
+    call
 
 ; Instruction: pop de
 .opcode_handler_d1
@@ -912,6 +948,11 @@ endmacro
     sta z80_f
     jmp dispatch_loop
 
+; Instruction: di
+.opcode_handler_f3
+    ; TODO: Do we need to emulate anything re interrupts?
+    jmp dispatch_loop
+
 ; Instruction: push af
 .opcode_handler_f5
     ldx z80_f
@@ -930,6 +971,10 @@ endmacro
 .opcode_handler_fe
     advance_pc_and_load
     cp_6502_a
+
+; Instruction: ld (**),sp
+.opcode_handler_ed_73
+    brk
 
 ; Instruction: ldir
 .opcode_handler_ed_b0
@@ -1191,7 +1236,7 @@ endmacro
     equw opcode_handler_c1
     equw opcode_handler_c2
     equw opcode_handler_c3
-    equw opcode_todo ; &c4
+    equw opcode_handler_c4
     equw opcode_handler_c5
     equw opcode_todo ; &c6
     equw opcode_todo ; &c7
@@ -1238,7 +1283,7 @@ endmacro
     equw opcode_todo ; &f0
     equw opcode_handler_f1
     equw opcode_todo ; &f2
-    equw opcode_todo ; &f3
+    equw opcode_handler_f3
     equw opcode_todo ; &f4
     equw opcode_handler_f5
     equw opcode_todo ; &f6
@@ -1369,7 +1414,7 @@ endmacro
     equw opcode_todo  ; &70
     equw opcode_todo  ; &71
     equw opcode_todo  ; &72
-    equw opcode_todo  ; &73
+    equw opcode_handler_ed_73
     equw opcode_todo  ; &74
     equw opcode_todo  ; &75
     equw opcode_todo  ; &76
