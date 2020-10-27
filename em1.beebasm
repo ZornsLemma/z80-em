@@ -92,6 +92,7 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_h equb 0
 .z80_l equb 0
 .z80_sp equw 0
+.z80_iy equw 0
 .operand_ptr equw 0 ; low byte always 0
 .zp_tmp equw 0 ; temporary workspace
 
@@ -967,6 +968,10 @@ endmacro
     ld_r_s          z80_sp + 1,z80_h
     jmp dispatch_loop
 
+; Instruction: IY prefix
+.opcode_handler_fd
+    multibyte_dispatch dispatch_table_fd_low, dispatch_table_fd_high
+
 ; Instruction: cp *
 .opcode_handler_fe
     advance_pc_and_load
@@ -1021,6 +1026,11 @@ endmacro
     restore_pc_bank_and_y
     jmp dispatch_loop
 }
+
+; Instruction: pop iy
+.opcode_handler_fd_e1
+    pop z80_iy + 1, z80_iy
+    jmp dispatch_loop
 
 ; TODO: Temporary hack to emulate bdos functions necessary for test code
 .bdos_emulation
@@ -1301,7 +1311,7 @@ endmacro
     equw opcode_todo ; &fa
     equw opcode_todo ; &fb
     equw opcode_todo ; &fc
-    equw opcode_todo ; &fd
+    equw opcode_handler_fd
     equw opcode_handler_fe
     equw opcode_todo ; &ff
 
@@ -1564,6 +1574,266 @@ endmacro
     equw opcode_todo  ; &fd
     equw opcode_todo  ; &fe
     equw opcode_todo  ; &ff
+
+    align &100
+.dispatch_table_fd_low
+    equw opcode_todo  ; 00
+    equw opcode_todo  ; 01
+    equw opcode_todo  ; 02
+    equw opcode_todo  ; 03
+    equw opcode_todo  ; 04
+    equw opcode_todo  ; 05
+    equw opcode_todo  ; 06
+    equw opcode_todo  ; 07
+    equw opcode_todo  ; 08
+    equw opcode_todo  ; 09
+    equw opcode_todo  ; 0a
+    equw opcode_todo  ; 0b
+    equw opcode_todo  ; 0c
+    equw opcode_todo  ; 0d
+    equw opcode_todo  ; 0e
+    equw opcode_todo  ; 0f
+    equw opcode_todo  ; 10
+    equw opcode_todo  ; 11
+    equw opcode_todo  ; 12
+    equw opcode_todo  ; 13
+    equw opcode_todo  ; 14
+    equw opcode_todo  ; 15
+    equw opcode_todo  ; 16
+    equw opcode_todo  ; 17
+    equw opcode_todo  ; 18
+    equw opcode_todo  ; 19
+    equw opcode_todo  ; 1a
+    equw opcode_todo  ; 1b
+    equw opcode_todo  ; 1c
+    equw opcode_todo  ; 1d
+    equw opcode_todo  ; 1e
+    equw opcode_todo  ; 1f
+    equw opcode_todo  ; 20
+    equw opcode_todo  ; 21
+    equw opcode_todo  ; 22
+    equw opcode_todo  ; 23
+    equw opcode_todo  ; 24
+    equw opcode_todo  ; 25
+    equw opcode_todo  ; 26
+    equw opcode_todo  ; 27
+    equw opcode_todo  ; 28
+    equw opcode_todo  ; 29
+    equw opcode_todo  ; 2a
+    equw opcode_todo  ; 2b
+    equw opcode_todo  ; 2c
+    equw opcode_todo  ; 2d
+    equw opcode_todo  ; 2e
+    equw opcode_todo  ; 2f
+    equw opcode_todo  ; 30
+    equw opcode_todo  ; 31
+    equw opcode_todo  ; 32
+    equw opcode_todo  ; 33
+    equw opcode_todo  ; 34
+    equw opcode_todo  ; 35
+    equw opcode_todo  ; 36
+    equw opcode_todo  ; 37
+    equw opcode_todo  ; 38
+    equw opcode_todo  ; 39
+    equw opcode_todo  ; 3a
+    equw opcode_todo  ; 3b
+    equw opcode_todo  ; 3c
+    equw opcode_todo  ; 3d
+    equw opcode_todo  ; 3e
+    equw opcode_todo  ; 3f
+    equw opcode_todo  ; 40
+    equw opcode_todo  ; 41
+    equw opcode_todo  ; 42
+    equw opcode_todo  ; 43
+    equw opcode_todo  ; 44
+    equw opcode_todo  ; 45
+    equw opcode_todo  ; 46
+    equw opcode_todo  ; 47
+    equw opcode_todo  ; 48
+    equw opcode_todo  ; 49
+    equw opcode_todo  ; 4a
+    equw opcode_todo  ; 4b
+    equw opcode_todo  ; 4c
+    equw opcode_todo  ; 4d
+    equw opcode_todo  ; 4e
+    equw opcode_todo  ; 4f
+    equw opcode_todo  ; 50
+    equw opcode_todo  ; 51
+    equw opcode_todo  ; 52
+    equw opcode_todo  ; 53
+    equw opcode_todo  ; 54
+    equw opcode_todo  ; 55
+    equw opcode_todo  ; 56
+    equw opcode_todo  ; 57
+    equw opcode_todo  ; 58
+    equw opcode_todo  ; 59
+    equw opcode_todo  ; 5a
+    equw opcode_todo  ; 5b
+    equw opcode_todo  ; 5c
+    equw opcode_todo  ; 5d
+    equw opcode_todo  ; 5e
+    equw opcode_todo  ; 5f
+    equw opcode_todo  ; 60
+    equw opcode_todo  ; 61
+    equw opcode_todo  ; 62
+    equw opcode_todo  ; 63
+    equw opcode_todo  ; 64
+    equw opcode_todo  ; 65
+    equw opcode_todo  ; 66
+    equw opcode_todo  ; 67
+    equw opcode_todo  ; 68
+    equw opcode_todo  ; 69
+    equw opcode_todo  ; 6a
+    equw opcode_todo  ; 6b
+    equw opcode_todo  ; 6c
+    equw opcode_todo  ; 6d
+    equw opcode_todo  ; 6e
+    equw opcode_todo  ; 6f
+    equw opcode_todo  ; 70
+    equw opcode_todo  ; 71
+    equw opcode_todo  ; 72
+    equw opcode_todo  ; 73
+    equw opcode_todo  ; 74
+    equw opcode_todo  ; 75
+    equw opcode_todo  ; 76
+    equw opcode_todo  ; 77
+    equw opcode_todo  ; 78
+    equw opcode_todo  ; 79
+    equw opcode_todo  ; 7a
+    equw opcode_todo  ; 7b
+    equw opcode_todo  ; 7c
+    equw opcode_todo  ; 7d
+    equw opcode_todo  ; 7e
+    equw opcode_todo  ; 7f
+.dispatch_table_fd_high
+    equw opcode_todo  ; 80
+    equw opcode_todo  ; 81
+    equw opcode_todo  ; 82
+    equw opcode_todo  ; 83
+    equw opcode_todo  ; 84
+    equw opcode_todo  ; 85
+    equw opcode_todo  ; 86
+    equw opcode_todo  ; 87
+    equw opcode_todo  ; 88
+    equw opcode_todo  ; 89
+    equw opcode_todo  ; 8a
+    equw opcode_todo  ; 8b
+    equw opcode_todo  ; 8c
+    equw opcode_todo  ; 8d
+    equw opcode_todo  ; 8e
+    equw opcode_todo  ; 8f
+    equw opcode_todo  ; 90
+    equw opcode_todo  ; 91
+    equw opcode_todo  ; 92
+    equw opcode_todo  ; 93
+    equw opcode_todo  ; 94
+    equw opcode_todo  ; 95
+    equw opcode_todo  ; 96
+    equw opcode_todo  ; 97
+    equw opcode_todo  ; 98
+    equw opcode_todo  ; 99
+    equw opcode_todo  ; 9a
+    equw opcode_todo  ; 9b
+    equw opcode_todo  ; 9c
+    equw opcode_todo  ; 9d
+    equw opcode_todo  ; 9e
+    equw opcode_todo  ; 9f
+    equw opcode_todo  ; a0
+    equw opcode_todo  ; a1
+    equw opcode_todo  ; a2
+    equw opcode_todo  ; a3
+    equw opcode_todo  ; a4
+    equw opcode_todo  ; a5
+    equw opcode_todo  ; a6
+    equw opcode_todo  ; a7
+    equw opcode_todo  ; a8
+    equw opcode_todo  ; a9
+    equw opcode_todo  ; aa
+    equw opcode_todo  ; ab
+    equw opcode_todo  ; ac
+    equw opcode_todo  ; ad
+    equw opcode_todo  ; ae
+    equw opcode_todo  ; af
+    equw opcode_todo  ; b0
+    equw opcode_todo  ; b1
+    equw opcode_todo  ; b2
+    equw opcode_todo  ; b3
+    equw opcode_todo  ; b4
+    equw opcode_todo  ; b5
+    equw opcode_todo  ; b6
+    equw opcode_todo  ; b7
+    equw opcode_todo  ; b8
+    equw opcode_todo  ; b9
+    equw opcode_todo  ; ba
+    equw opcode_todo  ; bb
+    equw opcode_todo  ; bc
+    equw opcode_todo  ; bd
+    equw opcode_todo  ; be
+    equw opcode_todo  ; bf
+    equw opcode_todo  ; c0
+    equw opcode_todo  ; c1
+    equw opcode_todo  ; c2
+    equw opcode_todo  ; c3
+    equw opcode_todo  ; c4
+    equw opcode_todo  ; c5
+    equw opcode_todo  ; c6
+    equw opcode_todo  ; c7
+    equw opcode_todo  ; c8
+    equw opcode_todo  ; c9
+    equw opcode_todo  ; ca
+    equw opcode_todo  ; cb
+    equw opcode_todo  ; cc
+    equw opcode_todo  ; cd
+    equw opcode_todo  ; ce
+    equw opcode_todo  ; cf
+    equw opcode_todo  ; d0
+    equw opcode_todo  ; d1
+    equw opcode_todo  ; d2
+    equw opcode_todo  ; d3
+    equw opcode_todo  ; d4
+    equw opcode_todo  ; d5
+    equw opcode_todo  ; d6
+    equw opcode_todo  ; d7
+    equw opcode_todo  ; d8
+    equw opcode_todo  ; d9
+    equw opcode_todo  ; da
+    equw opcode_todo  ; db
+    equw opcode_todo  ; dc
+    equw opcode_todo  ; dd
+    equw opcode_todo  ; de
+    equw opcode_todo  ; df
+    equw opcode_todo  ; e0
+    equw opcode_handler_fd_e1
+    equw opcode_todo  ; e2
+    equw opcode_todo  ; e3
+    equw opcode_todo  ; e4
+    equw opcode_todo  ; e5
+    equw opcode_todo  ; e6
+    equw opcode_todo  ; e7
+    equw opcode_todo  ; e8
+    equw opcode_todo  ; e9
+    equw opcode_todo  ; ea
+    equw opcode_todo  ; eb
+    equw opcode_todo  ; ec
+    equw opcode_todo  ; ed
+    equw opcode_todo  ; ee
+    equw opcode_todo  ; ef
+    equw opcode_todo  ; f0
+    equw opcode_todo  ; f1
+    equw opcode_todo  ; f2
+    equw opcode_todo  ; f3
+    equw opcode_todo  ; f4
+    equw opcode_todo  ; f5
+    equw opcode_todo  ; f6
+    equw opcode_todo  ; f7
+    equw opcode_todo  ; f8
+    equw opcode_todo  ; f9
+    equw opcode_todo  ; fa
+    equw opcode_todo  ; fb
+    equw opcode_todo  ; fc
+    equw opcode_todo  ; fd
+    equw opcode_todo  ; fe
+    equw opcode_todo  ; ff
 
     align &100
     include "tables.beebasm"
