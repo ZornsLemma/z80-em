@@ -315,6 +315,17 @@ macro ld_ind_hl_r r
     jmp dispatch_loop
 endmacro
 
+macro ld_rr_ind_abs high_r, low_r
+    set_operand_ptr_using_imm_16
+    lda (operand_ptr),y
+    sta low_r
+    jsr bump_operand_ptr_y
+    lda (operand_ptr),y
+    sta high_r
+    restore_pc_bank_and_y
+    jmp dispatch_loop
+endmacro
+
 macro ld_r_ind_hl r
     lda_ind_hl
     sta r
@@ -728,14 +739,7 @@ endmacro
 
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
-    set_operand_ptr_using_imm_16
-    lda (operand_ptr),y
-    sta z80_l
-    jsr bump_operand_ptr_y
-    lda (operand_ptr),y
-    sta z80_h
-    restore_pc_bank_and_y
-    jmp dispatch_loop
+    ld_rr_ind_abs z80_h, z80_l
 
 ; Instruction: add hl,hl
 .opcode_handler_29
@@ -982,6 +986,10 @@ endmacro
     advance_pc_and_load
     cp_6502_a
 
+; Instruction: sbc hl,bc
+.opcode_handler_ed_42
+    brk
+
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
     set_operand_ptr_using_imm_16
@@ -996,7 +1004,7 @@ endmacro
 
 ; Instruction: ld sp,(**)
 .opcode_handler_ed_7b
-    brk
+    ld_rr_ind_abs z80_sp + 1, z80_sp
 
 ; Instruction: ldir
 .opcode_handler_ed_b0
@@ -1397,7 +1405,7 @@ endmacro
     equw opcode_todo  ; &3f
     equw opcode_todo  ; &40
     equw opcode_todo  ; &41
-    equw opcode_todo  ; &42
+    equw opcode_handler_ed_42
     equw opcode_todo  ; &43
     equw opcode_todo  ; &44
     equw opcode_todo  ; &45
