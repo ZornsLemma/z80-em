@@ -1112,9 +1112,19 @@ endmacro
     pop z80_ix + 1, z80_ix
     jmp dispatch_loop
 
+; Instruction: push ix
+.opcode_handler_dd_e5
+    push z80_ix + 1, z80_ix
+    jmp dispatch_loop
+
 ; Instruction: pop iy
 .opcode_handler_fd_e1
     pop z80_iy + 1, z80_iy
+    jmp dispatch_loop
+
+; Instruction: push iy
+.opcode_handler_fd_e5
+    push z80_iy + 1, z80_iy
     jmp dispatch_loop
 
 ; TODO: Temporary hack to emulate bdos functions necessary for test code
@@ -1892,7 +1902,7 @@ endmacro
     equw opcode_todo  ; e2
     equw opcode_todo  ; e3
     equw opcode_todo  ; e4
-    equw opcode_todo  ; e5
+    equw opcode_handler_dd_e5
     equw opcode_todo  ; e6
     equw opcode_todo  ; e7
     equw opcode_todo  ; e8
@@ -2152,7 +2162,7 @@ endmacro
     equw opcode_todo  ; e2
     equw opcode_todo  ; e3
     equw opcode_todo  ; e4
-    equw opcode_todo  ; e5
+    equw opcode_handler_fd_e5
     equw opcode_todo  ; e6
     equw opcode_todo  ; e7
     equw opcode_todo  ; e8
