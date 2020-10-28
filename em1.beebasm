@@ -315,15 +315,19 @@ macro sta_ind_hl_via_tmp_fragment
     restore_pc_bank_and_y
 endmacro
 
-macro ld_ind_hl_r r
+macro ld_ind_rr_r high_r, low_r, s
     store_pc_bank_and_y
-    lda z80_h
+    lda high_r
     jsr set_operand_ptr_using_a
-    ldy z80_l
-    lda r
+    ldy low_r
+    lda s
     sta (operand_ptr),y
     restore_pc_bank_and_y
     jmp dispatch_loop
+endmacro
+
+macro ld_ind_hl_r r
+    ld_ind_rr_r z80_h, z80_l, r
 endmacro
 
 macro ld_rr_ind_abs high_r, low_r
@@ -632,13 +636,17 @@ macro dec_r r
     jmp dispatch_loop
 endmacro
 
-macro inc_r r
+macro inc_r_fragment r
     inc r
     lda z80_f
     and #hybrid_flag_c
     ldx r
     ora inc_flag_table,x
     sta z80_f
+endmacro
+
+macro inc_r r
+    inc_r_fragment r
     jmp dispatch_loop
 endmacro
 
@@ -806,6 +814,10 @@ endmacro
 .opcode_handler_11
     ld_rr_16 z80_d, z80_e
 
+; Instruction: ld (de),a
+.opcode_handler_12
+    ld_ind_rr_r z80_d, z80_e, z80_a
+
 ; Instruction: inc de
 .opcode_handler_13
     inc_rr z80_d, z80_e
@@ -876,7 +888,12 @@ endmacro
 
 ; Instruction: inc (hl)
 .opcode_handler_34
-    brk
+    ; TODO: This is probably storing and restoring pc bank and Y too often due to the component macros using them, but let's get it working before worrying about optimising this.
+    lda_ind_hl
+    ; TODO: storing this to zp_tmp to use inc_r is a bit crappy but again let's get it working before optimising
+    sta zp_tmp
+    inc_r_fragment zp_tmp
+    ld_ind_hl_r zp_tmp
 
 ; Instruction: ld (hl),*
 .opcode_handler_36
@@ -979,6 +996,11 @@ endmacro
 ; Instruction: ld a,a
 .opcode_handler_7f
     jmp dispatch_loop
+
+; Instruction: and b
+.opcode_handler_a0
+    lda z80_b
+    and_6502_a
 
 ; Instruction: and c
 .opcode_handler_a1
@@ -1227,7 +1249,7 @@ endmacro
     equw opcode_handler_0f
     equw opcode_todo ; &10
     equw opcode_handler_11
-    equw opcode_todo ; &12
+    equw opcode_handler_12
     equw opcode_handler_13
     equw opcode_handler_14
     equw opcode_todo ; &15
@@ -1370,7 +1392,7 @@ endmacro
     equw opcode_todo ; &9d
     equw opcode_todo ; &9e
     equw opcode_todo ; &9f
-    equw opcode_todo ; &a0
+    equw opcode_handler_a0
     equw opcode_handler_a1
     equw opcode_todo ; &a2
     equw opcode_todo ; &a3
