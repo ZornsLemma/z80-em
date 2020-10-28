@@ -778,6 +778,10 @@ endmacro
 .opcode_handler_0b
     dec_rr z80_b, z80_c
 
+; Instruction: dec c
+.opcode_handler_0d
+    dec_r z80_c
+
 ; Instruction: ld c,*
 .opcode_handler_0e
     ld_r_8 z80_c
@@ -869,6 +873,10 @@ endmacro
 ; Instruction: inc sp
 .opcode_handler_33
     inc_rr z80_sp + 1, z80_sp
+
+; Instruction: inc (hl)
+.opcode_handler_34
+    brk
 
 ; Instruction: ld (hl),*
 .opcode_handler_36
@@ -976,6 +984,11 @@ endmacro
 .opcode_handler_a1
     lda z80_c
     and_6502_a
+
+; Instruction: xor b
+.opcode_handler_a8
+    lda z80_b
+    xor_6502_a
 
 ; Instruction: xor (hl)
 .opcode_handler_ae
@@ -1209,7 +1222,7 @@ endmacro
     equw opcode_todo ; &0a
     equw opcode_handler_0b
     equw opcode_todo ; &0c
-    equw opcode_todo ; &0d
+    equw opcode_handler_0d
     equw opcode_handler_0e
     equw opcode_handler_0f
     equw opcode_todo ; &10
@@ -1248,7 +1261,7 @@ endmacro
     equw opcode_handler_31
     equw opcode_handler_32
     equw opcode_handler_33
-    equw opcode_todo ; &34
+    equw opcode_handler_34
     equw opcode_todo ; &35
     equw opcode_handler_36
     equw opcode_todo ; &37
@@ -1365,7 +1378,7 @@ endmacro
     equw opcode_todo ; &a5
     equw opcode_todo ; &a6
     equw opcode_todo ; &a7
-    equw opcode_todo ; &a8
+    equw opcode_handler_a8
     equw opcode_todo ; &a9
     equw opcode_todo ; &aa
     equw opcode_todo ; &ab
