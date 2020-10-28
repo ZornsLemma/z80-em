@@ -537,6 +537,42 @@ macro call_flag_clear hybrid_flag
     call_flag_internal hybrid_flag, FALSE
 endmacro
 
+macro ret
+    pop_corrupt_pc_bank_and_y z80_pch_logical, z80_pcl_tmp
+    ldy z80_pcl_tmp
+    jmp update_z80_pch_physical_and_dispatch
+endmacro
+
+macro ret_flag_internal hybrid_flag, branch_if_set
+    ; TODO: We could probably write some if-else macro code to optimise detection of bits which we can test by implicit-set-on-lda z80_f - this could potentially be shared with jp_flag_internal
+    lda z80_f
+    and #hybrid_flag
+if branch_if_set
+    beq no_branch
+else
+    bne no_branch
+endif
+    ret
+.no_branch
+    ; TODO: Following is duplicate of code in jp_flag_internal
+    tya
+    clc
+    adc #3
+    tay
+    bcs carry
+    jmp dispatch_loop_no_increment
+.carry
+    jmp new_pc_page_and_dispatch_loop_no_increment
+endmacro
+
+macro ret_flag_set hybrid_flag
+    ret_flag_internal hybrid_flag, TRUE
+endmacro
+
+macro ret_flag_clear hybrid_flag
+    ret_flag_internal hybrid_flag, FALSE
+endmacro
+
 macro push_internal high, low, save_pc_bank_and_y
 if save_pc_bank_and_y
     store_pc_bank_and_y
@@ -718,6 +754,12 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     sta z80_f
 .no_half_carry
     jmp dispatch_loop
+endmacro
+
+macro adc_rr_ss r_high, r_low, s_high, s_low
+    ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
+
+    brk
 endmacro
 
 macro sbc_rr_ss r_high, r_low, s_high, s_low
@@ -1055,13 +1097,11 @@ endmacro
 
 ; Instruction: ret z
 .opcode_handler_c8
-    brk
+    ret_flag_set hybrid_flag_c
 
 ; Instruction: ret
 .opcode_handler_c9
-    pop_corrupt_pc_bank_and_y z80_pch_logical, z80_pcl_tmp
-    ldy z80_pcl_tmp
-    jmp update_z80_pch_physical_and_dispatch
+    ret
 
 ; Instruction: jp z,**
 .opcode_handler_ca
@@ -1156,6 +1196,10 @@ endmacro
 ; Instruction: sbc hl,bc
 .opcode_handler_ed_42
     sbc_rr_ss z80_h, z80_l, z80_b, z80_c
+
+; Instruction: adc hl,bc
+.opcode_handler_ed_4a
+    adc_rr_ss z80_h, z80_l, z80_b, z80_c
 
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
@@ -1582,7 +1626,7 @@ endmacro
     equw opcode_todo  ; &47
     equw opcode_todo  ; &48
     equw opcode_todo  ; &49
-    equw opcode_todo  ; &4a
+    equw opcode_handler_ed_4a
     equw opcode_todo  ; &4b
     equw opcode_todo  ; &4c
     equw opcode_todo  ; &4d
