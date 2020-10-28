@@ -1062,8 +1062,6 @@ endmacro
 .opcode_handler_6e
     ld_r_ind_hl z80_l
 
-; TODO CODE REVIEW UP TO HERE
-
 ; Instruction: ld l,a
 .opcode_handler_6f
     ld_r_s z80_l, z80_a
@@ -1150,7 +1148,9 @@ endmacro
 
 ; Instruction: ret z
 .opcode_handler_c8
-    ret_flag_set hybrid_flag_c
+    ret_flag_set hybrid_flag_z
+
+; TODO: CODE REVIEW UP TO HERE
 
 ; Instruction: ret
 .opcode_handler_c9
