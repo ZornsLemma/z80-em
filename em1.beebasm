@@ -350,6 +350,7 @@ macro ld_rr_ind_abs high_r, low_r
 endmacro
 
 macro ld_r_ind_rr r, high_s, low_s
+    ; Note that r can be the same as one of high_s or low_s; this doesn't cause any special complications though.
     lda_ind_rr high_s, low_s
     sta r
     jmp dispatch_loop
@@ -811,8 +812,6 @@ macro adc_rr_ss r_high, r_low, s_high, s_low
     jmp dispatch_loop
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
-
 macro sbc_rr_ss r_high, r_low, s_high, s_low
     ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
     lda r_high
@@ -889,7 +888,7 @@ endmacro
 
 ; Instruction: rrca
 .opcode_handler_0f
-    ; TODO: An 8-bit rotate could be done using a lookup table
+    ; TODO: An 8-bit rotate could be done using a lookup table (also in rlca, if it's faster there)
     lda z80_a
     lsr a
     bcc top_bit_0
@@ -957,6 +956,7 @@ endmacro
 
 ; Instruction: add hl,hl
 .opcode_handler_29
+    ; TODO: May be able to optimise implementation of this
     add_rr_ss z80_h, z80_l, z80_h, z80_l
 
 ; Instruction: dec hl
@@ -1061,6 +1061,8 @@ endmacro
 ; Instruction: ld l,(hl)
 .opcode_handler_6e
     ld_r_ind_hl z80_l
+
+; TODO CODE REVIEW UP TO HERE
 
 ; Instruction: ld l,a
 .opcode_handler_6f
