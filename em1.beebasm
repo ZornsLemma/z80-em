@@ -115,6 +115,7 @@ hybrid_flag_z = 1 << 1 ; 6502 Z flag
 hybrid_flag_c = 1 << 0 ; 6502 C flag
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
 hybrid_flag_szpc = hybrid_flag_s or hybrid_flag_z or hybrid_flag_p or hybrid_flag_c
+hybrid_flag_zh = hybrid_flag_z or hybrid_flag_h
 hybrid_flag_hnc = hybrid_flag_h or hybrid_flag_n or hybrid_flag_c
 hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
 
@@ -597,6 +598,9 @@ macro inc_r r
     jmp dispatch_loop
 endmacro
 
+; Instruction: nop
+.opcode_handler_00
+    jmp dispatch_loop
 
 ; Instruction: ld bc,**
 .opcode_handler_01
@@ -631,6 +635,7 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     ; Note that r and s may be the same, so we can't assume s_high is unchanged
     ; when we come to determine H. There's no harm in doing this step first
     ; anyway.
+    ; TODO: Far from confident the flag handling here is correct
     lda s_high
     and #&0f
     sta zp_tmp + 1
@@ -660,6 +665,64 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     ora #hybrid_flag_h
     sta z80_f
 .no_half_carry
+    jmp dispatch_loop
+endmacro
+
+macro sbc_rr_ss r_high, r_low, s_high, s_low
+    ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
+    lda r_high
+    sta zp_tmp + 1
+    lda r_low
+    sta zp_tmp
+
+    ; Set 6502 carry based on Z80 carry.
+    lda z80_f
+    assert hybrid_flag_c == 1
+    eor #1
+    lsr a
+
+    lda r_low
+    sbc s_low
+    sta r_low
+    lda r_high
+    sbc s_high
+    sta r_high
+
+    ; b-em-our variable correspondence:
+    ; r = r_high/r_low
+    ; b = s_high/s_low
+    ; a = zp_tmp
+
+    ; take S, V, C from 6502 flags
+    php
+    pla
+    ; force Z, H clear so we can choose to set them below
+    and_not hybrid_flag_zh
+    ; force N on
+    ora #hybrid_flag_n
+    ; toggle 6502 carry to give Z80-style carry
+    eor #hybrid_flag_c
+    sta z80_f
+
+    ; calculate H
+    lda r_high
+    eor s_high
+    eor zp_tmp + 1
+    and #1<<4
+    beq no_half_carry
+    lda z80_f
+    ora #hybrid_flag_h
+    sta z80_f
+.no_half_carry
+
+    ; calculate Z
+    lda r_high
+    ora r_low
+    bne not_zero
+    lda z80_f
+    ora #hybrid_flag_z
+    sta z80_f
+.not_zero
     jmp dispatch_loop
 endmacro
 
@@ -988,7 +1051,7 @@ endmacro
 
 ; Instruction: sbc hl,bc
 .opcode_handler_ed_42
-    brk
+    sbc_rr_ss z80_h, z80_l, z80_b, z80_c
 
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
@@ -1079,7 +1142,7 @@ endmacro
 
     align &100
 .dispatch_table_low
-    equw opcode_todo ; &00
+    equw opcode_handler_00
     equw opcode_handler_01
     equw opcode_todo ; &02
     equw opcode_handler_03
