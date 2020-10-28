@@ -1150,8 +1150,6 @@ endmacro
 .opcode_handler_c8
     ret_flag_set hybrid_flag_z
 
-; TODO: CODE REVIEW UP TO HERE
-
 ; Instruction: ret
 .opcode_handler_c9
     ret
@@ -1228,9 +1226,8 @@ endmacro
 
 ; Instruction: ld sp,hl
 .opcode_handler_f9
-    ld_r_s_fragment z80_sp    ,z80_l
-    ld_r_s          z80_sp + 1,z80_h
-    jmp dispatch_loop
+    ld_r_s_fragment z80_sp    , z80_l
+    ld_r_s          z80_sp + 1, z80_h
 
 ; Instruction: ei
 .opcode_handler_fb
