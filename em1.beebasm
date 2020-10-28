@@ -6,6 +6,7 @@ romsel_copy = &f4
 
 osasci = &ffe3
 
+; TODO: Rename to "clear_bits"?
 macro and_not n
     and #not(n) and &ff
 endmacro
@@ -32,9 +33,9 @@ macro set_z80_pc_abs abs
 endmacro
     
 ; The main instruction dispatch loop is executed from zero page.
-; The handlers may use A and X as scratch registers but must preserve:
-; - Y, the low byte of the Z80 PC
-; - the currently paged in RAM bank is the one containing the Z80 PC
+; The handlers may use A and X as scratch registers but must return with:
+; - Y holding the low byte of the Z80 PC
+; - the RAM bank containing the Z80 PC paged in
     org 0
     guard &90
 .zp_code_start
@@ -71,6 +72,7 @@ endmacro
     lda z80_pch_physical
     cmp #&c0
     bne new_pc_page_return
+    ; TODO: Might be more efficient to jmp to some variant on update_z80_pch_physical which finishes by doing jmp dispatch_loop_no_increment
     jsr update_z80_pch_physical
     jmp new_pc_page_return
 }
@@ -125,6 +127,7 @@ hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
 .start
     ; Copy the zero page code into the correct location.
 {
+    assert zp_code_len <= 128
     ldy #zp_code_len - 1
 .loop
     lda zp_code_copy,y
@@ -136,6 +139,7 @@ hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
     ; Initialise zero page.
     lda #0
     sta operand_ptr
+    ; TODO: Initialise other stuff too?
 
     ; Store top of RAM at address 6. TODO: This is a bit of a hack but it seems
     ; to be what zexall wants to initialise sp; I suspect eventually this will
@@ -189,6 +193,7 @@ macro advance_pc_and_load
     ; TODO: Copy of code in zp dispatch loop, factor out using a macro?
     inc z80_pch_logical
     inc z80_pch_physical
+    ; TODO: Can we do "bit z80_pch_physical:bvc not_new_pc_bank" here, to save the cmp?
     lda z80_pch_physical
     cmp #&c0
     bne not_new_pc_bank
@@ -203,6 +208,7 @@ endmacro
 {
     inc z80_pch_logical
     inc z80_pch_physical
+    ; TODO: bit:bvc optimisation as in advance_pc_and_load?
     lda z80_pch_physical
     cmp #&c0
     bne not_new_pc_bank
@@ -231,6 +237,7 @@ endmacro
     rts
 .new_page
     inc operand_ptr + 1
+    ; TODO: bit:bvc test as in advance_pc_and_load?
     lda operand_ptr + 1
     cmp #&c0
     beq new_bank
