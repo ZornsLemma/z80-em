@@ -293,11 +293,11 @@ macro ld_rr_16 high_r, low_r
     jmp dispatch_loop
 endmacro
 
-macro lda_ind_hl
+macro lda_ind_rr high_r, low_r
     store_pc_bank_and_y
-    lda z80_h
+    lda high_r
     jsr set_operand_ptr_using_a
-    ldy z80_l
+    ldy low_r
     lda (operand_ptr),y
     restore_pc_bank_and_y
 endmacro
@@ -337,10 +337,18 @@ macro ld_rr_ind_abs high_r, low_r
     jmp dispatch_loop
 endmacro
 
-macro ld_r_ind_hl r
-    lda_ind_hl
+macro ld_r_ind_rr r, high_s, low_s
+    lda_ind_rr high_s, low_s
     sta r
     jmp dispatch_loop
+endmacro
+
+macro lda_ind_hl
+    lda_ind_rr z80_h, z80_l
+endmacro
+
+macro ld_r_ind_hl r
+    ld_r_ind_rr r, z80_h, z80_l
 endmacro
 
 macro ld_ind_abs_rr high_r, low_r
@@ -796,6 +804,10 @@ endmacro
 .opcode_handler_19
     add_rr_ss z80_h, z80_l, z80_d, z80_e
 
+; Instruction: ld a,(de)
+.opcode_handler_1a
+    ld_r_ind_rr z80_a, z80_d, z80_e
+
 ; Instruction: dec de
 .opcode_handler_1b
     dec_rr z80_d, z80_e
@@ -950,6 +962,10 @@ endmacro
 .opcode_handler_a1
     lda z80_c
     and_6502_a
+
+; Instruction: xor (hl)
+.opcode_handler_ae
+    brk
 
 ; Instruction: or (hl)
 .opcode_handler_b6
@@ -1191,7 +1207,7 @@ endmacro
     equw opcode_todo ; &17
     equw opcode_todo ; &18
     equw opcode_handler_19
-    equw opcode_todo ; &1a
+    equw opcode_handler_1a
     equw opcode_handler_1b
     equw opcode_todo ; &1c
     equw opcode_todo ; &1d
@@ -1340,7 +1356,7 @@ endmacro
     equw opcode_todo ; &ab
     equw opcode_todo ; &ac
     equw opcode_todo ; &ad
-    equw opcode_todo ; &ae
+    equw opcode_handler_ae
     equw opcode_todo ; &af
     equw opcode_todo ; &b0
     equw opcode_todo ; &b1
