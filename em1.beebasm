@@ -116,6 +116,7 @@ hybrid_flag_c = 1 << 0 ; 6502 C flag
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
 hybrid_flag_szpc = hybrid_flag_s or hybrid_flag_z or hybrid_flag_p or hybrid_flag_c
 hybrid_flag_zh = hybrid_flag_z or hybrid_flag_h
+hybrid_flag_zhn = hybrid_flag_z or hybrid_flag_h or hybrid_flag_n
 hybrid_flag_hnc = hybrid_flag_h or hybrid_flag_n or hybrid_flag_c
 hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
 
@@ -757,9 +758,50 @@ macro add_rr_ss r_high, r_low, s_high, s_low
 endmacro
 
 macro adc_rr_ss r_high, r_low, s_high, s_low
-    ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
+    ; TODO: This is a super-inefficient implementation, let's get it correct before tuning it
 
-    brk
+    ; Note that r and s may be the same, so we can't assume s_high is unchanged
+    ; when we come to determine H. There's no harm in doing this step first
+    ; anyway.
+    lda s_high
+    and #&0f
+    sta zp_tmp + 1
+
+    ; Set 6502 carry based on Z80 carry.
+    lda z80_f
+    assert hybrid_flag_c == 1
+    eor #1
+    lsr a
+
+    lda r_low
+    adc s_low
+    sta r_low
+    php
+    lda r_high
+    tax
+    adc s_high
+    sta r_high
+
+    ; take S, V, C from 6502 flags
+    php
+    pla
+    ; force Z, H clear so we can choose to set them below and force N clear
+    and_not hybrid_flag_zhn
+
+    ; calculate H
+    txa
+    and #&0f
+    plp
+    adc zp_tmp + 1
+    and #&f0
+    beq no_half_carry
+    ; TODO: If we made H bit 0 of hybrid flags, we could replace the following three instructions with inc z80_f. Whether this is worthwhile depends on whether we use the 6502 C flag via php:pla to set the hybrid C flag at any point.
+    lda z80_f
+    ora #hybrid_flag_h
+    sta z80_f
+.no_half_carry
+
+    jmp dispatch_loop
 endmacro
 
 macro sbc_rr_ss r_high, r_low, s_high, s_low
@@ -1200,6 +1242,16 @@ endmacro
 ; Instruction: adc hl,bc
 .opcode_handler_ed_4a
     adc_rr_ss z80_h, z80_l, z80_b, z80_c
+
+; Instruction: sbc hl,hl
+.opcode_handler_ed_62
+    ; TODO: I have no idea if this instruction is actually common but if it is its implementation can probably be specialised, since I *suspect* (haven't checked) its result only boils down to the current state of the carry
+    sbc_rr_ss z80_h, z80_l, z80_h, z80_l
+
+; Instruction: adc hl,hl
+.opcode_handler_ed_6a
+    ; TODO: It may be possible to optimise this instruction - not necessarily, but it may be its doubling-plus-carry nature means we can avoid some of the inefficiencies normally needed
+    adc_rr_ss z80_h, z80_l, z80_h, z80_l
 
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
@@ -1650,7 +1702,7 @@ endmacro
     equw opcode_todo  ; &5f
     equw opcode_todo  ; &60
     equw opcode_todo  ; &61
-    equw opcode_todo  ; &62
+    equw opcode_handler_ed_62
     equw opcode_todo  ; &63
     equw opcode_todo  ; &64
     equw opcode_todo  ; &65
@@ -1658,7 +1710,7 @@ endmacro
     equw opcode_todo  ; &67
     equw opcode_todo  ; &68
     equw opcode_todo  ; &69
-    equw opcode_todo  ; &6a
+    equw opcode_handler_ed_6a
     equw opcode_todo  ; &6b
     equw opcode_todo  ; &6c
     equw opcode_todo  ; &6d
