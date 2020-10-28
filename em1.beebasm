@@ -746,6 +746,7 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     sta r_high
     lda z80_f
     and_not hybrid_flag_hnc
+    ; TODO: Can we just do "adc #0" instead of this bcc:ora sequence?
     bcc no_carry
     ora #hybrid_flag_c
 .no_carry
@@ -777,7 +778,6 @@ macro adc_rr_ss r_high, r_low, s_high, s_low
     ; Set 6502 carry based on Z80 carry.
     lda z80_f
     assert hybrid_flag_c == 1
-    eor #1
     lsr a
 
     lda r_low
@@ -810,6 +810,8 @@ macro adc_rr_ss r_high, r_low, s_high, s_low
 
     jmp dispatch_loop
 endmacro
+
+; TODO: CODE REVIEW UP TO HERE
 
 macro sbc_rr_ss r_high, r_low, s_high, s_low
     ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
