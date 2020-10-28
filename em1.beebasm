@@ -258,6 +258,16 @@ macro restore_pc_bank_and_y
     ldy z80_pcl_tmp
 endmacro
 
+; TODO: This may be useful in places which currently have this code written out inline
+macro set_operand_ptr_using_imm_16
+    advance_pc_and_load
+    sta zp_tmp
+    advance_pc_and_load
+    store_pc_bank_and_y
+    jsr set_operand_ptr_using_a
+    ldy zp_tmp
+endmacro
+
 macro ld_r_8 r
     advance_pc_and_load
     sta r
@@ -330,6 +340,18 @@ endmacro
 macro ld_r_ind_hl r
     lda_ind_hl
     sta r
+    jmp dispatch_loop
+endmacro
+
+macro ld_ind_abs_rr high_r, low_r
+    ; TODO: What order do the bytes get stored in?
+    set_operand_ptr_using_imm_16
+    lda low_r
+    sta (operand_ptr),y
+    jsr bump_operand_ptr_y
+    lda high_r
+    sta (operand_ptr),y
+    restore_pc_bank_and_y
     jmp dispatch_loop
 endmacro
 
@@ -782,6 +804,10 @@ endmacro
 .opcode_handler_21
     ld_rr_16 z80_h, z80_l
 
+; Instruction: ld (**),hl
+.opcode_handler_22
+    ld_ind_abs_rr z80_h, z80_l
+
 ; Instruction: inc hl
 .opcode_handler_23
     inc_rr z80_h, z80_l
@@ -789,16 +815,6 @@ endmacro
 ; Instruction: ld h,*
 .opcode_handler_26
     ld_r_8 z80_h
-
-; TODO: This may be useful in places which currently have this code written out inline
-macro set_operand_ptr_using_imm_16
-    advance_pc_and_load
-    sta zp_tmp
-    advance_pc_and_load
-    store_pc_bank_and_y
-    jsr set_operand_ptr_using_a
-    ldy zp_tmp
-endmacro
 
 ; Instruction: ld hl,(**)
 .opcode_handler_2a
@@ -1040,6 +1056,11 @@ endmacro
     ld_r_s          z80_sp + 1,z80_h
     jmp dispatch_loop
 
+; Instruction: ei
+.opcode_handler_fb
+    ; TODO: Anything to emulate re interrupts?
+    jmp dispatch_loop
+
 ; Instruction: IY prefix
 .opcode_handler_fd
     multibyte_dispatch dispatch_table_fd_low, dispatch_table_fd_high
@@ -1055,15 +1076,7 @@ endmacro
 
 ; Instruction: ld (**),sp
 .opcode_handler_ed_73
-    set_operand_ptr_using_imm_16
-    ; TODO: What order do the bytes get stored in?
-    lda z80_sp
-    sta (operand_ptr),y
-    jsr bump_operand_ptr_y
-    lda z80_sp + 1
-    sta (operand_ptr),y
-    restore_pc_bank_and_y
-    jmp dispatch_loop
+    ld_ind_abs_rr z80_sp + 1, z80_sp
 
 ; Instruction: ld sp,(**)
 .opcode_handler_ed_7b
@@ -1186,7 +1199,7 @@ endmacro
     equw opcode_todo ; &1f
     equw opcode_todo ; &20
     equw opcode_handler_21
-    equw opcode_todo ; &22
+    equw opcode_handler_22
     equw opcode_handler_23
     equw opcode_todo ; &24
     equw opcode_todo ; &25
@@ -1404,7 +1417,7 @@ endmacro
     equw opcode_todo ; &f8
     equw opcode_handler_f9
     equw opcode_todo ; &fa
-    equw opcode_todo ; &fb
+    equw opcode_handler_fb
     equw opcode_todo ; &fc
     equw opcode_handler_fd
     equw opcode_handler_fe
