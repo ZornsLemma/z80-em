@@ -977,6 +977,10 @@ endmacro
 .opcode_handler_77
     ld_ind_hl_r z80_a
 
+; Instruction: ld a,b
+.opcode_handler_78
+    ld_r_s z80_a, z80_b
+
 ; Instruction: ld a,c
 .opcode_handler_79
     ld_r_s z80_a, z80_c
@@ -1012,6 +1016,11 @@ endmacro
     lda z80_b
     xor_6502_a
 
+; Instruction: xor c
+.opcode_handler_a9
+    lda z80_c
+    xor_6502_a
+
 ; Instruction: xor (hl)
 .opcode_handler_ae
     lda_ind_hl
@@ -1044,6 +1053,10 @@ endmacro
     push z80_b, z80_c
     jmp dispatch_loop
 
+; Instruction: ret z
+.opcode_handler_c8
+    brk
+
 ; Instruction: ret
 .opcode_handler_c9
     pop_corrupt_pc_bank_and_y z80_pch_logical, z80_pcl_tmp
@@ -1067,6 +1080,10 @@ endmacro
 .opcode_handler_d5
     push z80_d, z80_e
     jmp dispatch_loop
+
+; Instruction: call c, **
+.opcode_handler_dc
+    call_flag_set hybrid_flag_c
 
 ; Instruction: IX prefix
 .opcode_handler_dd
@@ -1351,7 +1368,7 @@ endmacro
     equw opcode_todo ; &75
     equw opcode_todo ; &76
     equw opcode_handler_77
-    equw opcode_todo ; &78
+    equw opcode_handler_78
     equw opcode_handler_79
     equw opcode_handler_7a
     equw opcode_handler_7b
@@ -1401,7 +1418,7 @@ endmacro
     equw opcode_todo ; &a6
     equw opcode_todo ; &a7
     equw opcode_handler_a8
-    equw opcode_todo ; &a9
+    equw opcode_handler_a9
     equw opcode_todo ; &aa
     equw opcode_todo ; &ab
     equw opcode_todo ; &ac
@@ -1432,7 +1449,7 @@ endmacro
     equw opcode_handler_c5
     equw opcode_todo ; &c6
     equw opcode_todo ; &c7
-    equw opcode_todo ; &c8
+    equw opcode_handler_c8
     equw opcode_handler_c9
     equw opcode_handler_ca
     equw opcode_todo ; &cb
@@ -1452,7 +1469,7 @@ endmacro
     equw opcode_todo ; &d9
     equw opcode_todo ; &da
     equw opcode_todo ; &db
-    equw opcode_todo ; &dc
+    equw opcode_handler_dc
     equw opcode_handler_dd
     equw opcode_todo ; &de
     equw opcode_todo ; &df
