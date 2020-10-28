@@ -408,6 +408,20 @@ macro or_6502_a
     jmp dispatch_loop
 endmacro
 
+macro xor_6502_a
+    eor z80_a
+    sta z80_a
+    tax
+    ; TODO: As in some other places, the entire flag determination can probably be done by a single lookup table here
+    ; Clear H, N, C and set S, Z, P according to result
+    php
+    pla
+    and #hybrid_flag_sz
+    ora parity_table,x
+    sta z80_f
+    jmp dispatch_loop
+endmacro
+
 macro cp_6502_a
     ; TODO: Far from confident about the correctness of this!
     sta zp_tmp
@@ -965,7 +979,8 @@ endmacro
 
 ; Instruction: xor (hl)
 .opcode_handler_ae
-    brk
+    lda_ind_hl
+    xor_6502_a
 
 ; Instruction: or (hl)
 .opcode_handler_b6
