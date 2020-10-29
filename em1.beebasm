@@ -677,7 +677,6 @@ macro pop high, low
     pop_internal high, low, TRUE
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
 macro ex_r_s_fragment r, s
     ldx s
     lda r
@@ -749,6 +748,7 @@ endmacro
 
 ; Instruction: rlca
 .opcode_handler_07
+    ; TODO: b-em doesn't seem to clear H and N if I read the code right, but z80-documented.pdf does show these as getting cleared
     lda z80_a
     cmp #&80
     rol a
@@ -798,6 +798,7 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     jmp dispatch_loop
 endmacro
 
+; TODO: CODE REVIEW UP TO HERE
 macro adc_rr_ss r_high, r_low, s_high, s_low
     ; TODO: This is a super-inefficient implementation, let's get it correct before tuning it
 
