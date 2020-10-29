@@ -649,7 +649,6 @@ endif
     lda z80_sp + 1
     jsr set_operand_ptr_using_a
     ldy z80_sp
-    ; TODO: Which order do the bytes get popped off the stack? This order seems logical but may not be correct.
     lda (operand_ptr),y
     sta low
     jsr bump_operand_ptr_y
