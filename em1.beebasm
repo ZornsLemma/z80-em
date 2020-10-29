@@ -1043,6 +1043,10 @@ endmacro
 .opcode_handler_3c
     inc_r z80_a
 
+; Instruction: dec a
+.opcode_handler_3d
+    dec_r z80_a
+
 ; Instruction: ld a,*
 .opcode_handler_3e
     ld_r_8 z80_a
@@ -1474,7 +1478,7 @@ endmacro
     equw opcode_handler_3a
     equw opcode_handler_3b
     equw opcode_handler_3c
-    equw opcode_todo ; &3d
+    equw opcode_handler_3d
     equw opcode_handler_3e
     equw opcode_todo ; &3f
     equw opcode_todo ; &40

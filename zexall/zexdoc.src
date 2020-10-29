@@ -108,6 +108,7 @@ done:	ld	de,msg2
 	jp	0		; warm boot
 
 tests:
+	if 0 ; SFTODO TEMP
 	dw	adc16
 	dw	add16
 	dw	add16x
@@ -121,6 +122,7 @@ tests:
 	dw	cpd1
 	dw	cpi1
 	dw	daaop	; can't use opcode as label
+	endif ; SFTODO TEMP
 	dw	inca
 	dw	incb
 	dw	incbc
