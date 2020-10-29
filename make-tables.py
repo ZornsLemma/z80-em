@@ -36,7 +36,7 @@ with open("tables.beebasm", "w") as f:
         j |= (i & 0b01000000) >> 4
         j |= (i & 0b00000100) >> 1
         j |= (i & 0b00000010) << 5
-        j |=      0b00101000 # unused flag bits are always set
+        j |=      0b00101000 # unused flag bits are always set TODO: That's not true, see z80-documented.pdf, but not worrying about it for now
         print("    equb %%%s ; &%02x %%%s" % (mybin(j), i, mybin(i)))
 
     print("")

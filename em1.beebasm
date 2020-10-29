@@ -696,6 +696,7 @@ macro inc_r r
 endmacro
 
 ; Instruction: nop
+.opcode_handler_nop
 .opcode_handler_00
     jmp dispatch_loop
 
@@ -1119,9 +1120,21 @@ endmacro
     lda_ind_hl
     xor_6502_a
 
+; Instruction: xor a
+.opcode_handler_af
+    ; TODO: It might be possible to implement this specially
+    lda z80_a
+    xor_6502_a
+
 ; Instruction: or (hl)
 .opcode_handler_b6
     lda_ind_hl
+    or_6502_a
+
+; Instruction: or a
+.opcode_handler_b7
+    ; TODO: It may be possible to implement this specially (we're or-ing a with itself)
+    lda z80_a
     or_6502_a
 
 ; Instruction: pop bc
@@ -1528,7 +1541,7 @@ endmacro
     equw opcode_todo ; &ac
     equw opcode_todo ; &ad
     equw opcode_handler_ae
-    equw opcode_todo ; &af
+    equw opcode_handler_af
     equw opcode_todo ; &b0
     equw opcode_todo ; &b1
     equw opcode_todo ; &b2
@@ -1536,7 +1549,7 @@ endmacro
     equw opcode_todo ; &b4
     equw opcode_todo ; &b5
     equw opcode_handler_b6
-    equw opcode_todo ; &b7
+    equw opcode_handler_b7
     equw opcode_todo ; &b8
     equw opcode_todo ; &b9
     equw opcode_todo ; &ba
@@ -1807,7 +1820,7 @@ endmacro
     equw opcode_todo  ; &bf
     equw opcode_todo  ; &c0
     equw opcode_todo  ; &c1
-    equw opcode_todo  ; &c2
+    equw opcode_handler_nop   ; &c2
     equw opcode_todo  ; &c3
     equw opcode_todo  ; &c4
     equw opcode_todo  ; &c5
@@ -1815,7 +1828,7 @@ endmacro
     equw opcode_todo  ; &c7
     equw opcode_todo  ; &c8
     equw opcode_todo  ; &c9
-    equw opcode_todo  ; &ca
+    equw opcode_handler_nop  ; &ca
     equw opcode_todo  ; &cb
     equw opcode_todo  ; &cc
     equw opcode_todo  ; &cd
@@ -1839,15 +1852,15 @@ endmacro
     equw opcode_todo  ; &df
     equw opcode_todo  ; &e0
     equw opcode_todo  ; &e1
-    equw opcode_todo  ; &e2
-    equw opcode_todo  ; &e3
+    equw opcode_handler_nop  ; &e2
+    equw opcode_handler_nop  ; &e3
     equw opcode_todo  ; &e4
     equw opcode_todo  ; &e5
     equw opcode_todo  ; &e6
     equw opcode_todo  ; &e7
     equw opcode_todo  ; &e8
     equw opcode_todo  ; &e9
-    equw opcode_todo  ; &ea
+    equw opcode_handler_nop  ; &ea
     equw opcode_todo  ; &eb
     equw opcode_todo  ; &ec
     equw opcode_todo  ; &ed
