@@ -465,7 +465,6 @@ macro xor_6502_a
     jmp dispatch_loop
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
 macro cp_6502_a
     ; TODO: Far from confident about the correctness of this!
     sta zp_tmp
@@ -678,6 +677,7 @@ macro pop high, low
     pop_internal high, low, TRUE
 endmacro
 
+; TODO: CODE REVIEW UP TO HERE
 macro ex_r_s_fragment r, s
     ldx s
     lda r
