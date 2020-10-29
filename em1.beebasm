@@ -902,7 +902,6 @@ macro sbc_rr_ss r_high, r_low, s_high, s_low
     jmp dispatch_loop
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
 ; Instruction: add hl,bc
 .opcode_handler_09
     add_rr_ss z80_h, z80_l, z80_b, z80_c
@@ -924,10 +923,11 @@ endmacro
     ; TODO: An 8-bit rotate could be done using a lookup table (also in rlca, if it's faster there)
     lda z80_a
     lsr a
-    bcc top_bit_0
+    bcc low_bit_0
     ora #&80
-.top_bit_0
+.low_bit_0
     sta z80_a
+    ; TODO: b-em code doesn't seem to clear H or N
     lda z80_f
     and_not hybrid_flag_hnc
     assert hybrid_flag_c == 1
@@ -935,6 +935,7 @@ endmacro
     sta z80_f
     jmp dispatch_loop
 
+; TODO: CODE REVIEW UP TO HERE
 ; Instruction: ld de,**
 .opcode_handler_11
     ld_rr_16 z80_d, z80_e
