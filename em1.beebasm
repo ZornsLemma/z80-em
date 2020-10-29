@@ -396,7 +396,6 @@ macro dec_rr high_r, low_r
     jmp dispatch_loop
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
 macro add_6502_a
     ; SFTODO: Half carry ruins efficiency here, I haven't tried to tweak this to be faster, let's get it working first
     tax
@@ -466,6 +465,7 @@ macro xor_6502_a
     jmp dispatch_loop
 endmacro
 
+; TODO: CODE REVIEW UP TO HERE
 macro cp_6502_a
     ; TODO: Far from confident about the correctness of this!
     sta zp_tmp
