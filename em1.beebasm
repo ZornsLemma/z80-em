@@ -1165,6 +1165,10 @@ endmacro
     push z80_b, z80_c
     jmp dispatch_loop
 
+; Instruction: add a,*
+.opcode_handler_c6
+    SFTODO
+
 ; Instruction: ret z
 .opcode_handler_c8
     ret_flag_set hybrid_flag_z
@@ -1574,7 +1578,7 @@ endmacro
     equw opcode_handler_c3
     equw opcode_handler_c4
     equw opcode_handler_c5
-    equw opcode_todo ; &c6
+    equw opcode_handler_c6
     equw opcode_todo ; &c7
     equw opcode_handler_c8
     equw opcode_handler_c9
