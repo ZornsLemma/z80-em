@@ -393,6 +393,33 @@ macro dec_rr high_r, low_r
     jmp dispatch_loop
 endmacro
 
+macro add_6502_a
+    ; SFTODO: Half carry ruins efficiency here, I haven't tried to tweak this to be faster, let's get it working first
+    tax
+    lda z80_a
+    and #&0f
+    sta zp_tmp
+    txa
+    clc
+    adc z80_a
+    sta z80_a
+    php
+    pla
+    and #hybrid_flag_szpc
+    sta z80_f
+    txa
+    and #&0f
+    clc
+    adc zp_tmp
+    and #&f0
+    beq no_half_carry
+    lda z80_f
+    ora #hybrid_flag_h
+    sta z80_f
+.no_half_carry
+    jmp dispatch_loop
+endmacro
+
 macro and_6502_a
     and z80_a
     sta z80_a
@@ -1167,7 +1194,8 @@ endmacro
 
 ; Instruction: add a,*
 .opcode_handler_c6
-    SFTODO
+    advance_pc_and_load
+    add_6502_a
 
 ; Instruction: ret z
 .opcode_handler_c8
@@ -1357,9 +1385,15 @@ endmacro
 ; TODO: Temporary hack to emulate bdos functions necessary for test code
 .bdos_emulation
     lda z80_c
+    cmp #2
+    beq bdos_emulation_write
     cmp #9
     beq bdos_emulation_writestr
     brk
+.bdos_emulation_write
+    lda z80_e
+    jsr osasci
+    jmp opcode_handler_c9
 .bdos_emulation_writestr
 {
     lda z80_d
