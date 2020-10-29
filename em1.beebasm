@@ -118,6 +118,7 @@ hybrid_flag_h = 1 << 4
 hybrid_flag_n = 1 << 2
 hybrid_flag_z = 1 << 1 ; 6502 Z flag
 hybrid_flag_c = 1 << 0 ; 6502 C flag
+hybrid_flag_spc = hybrid_flag_s or hybrid_flag_p or hybrid_flag_c
 hybrid_flag_sz = hybrid_flag_s or hybrid_flag_z
 hybrid_flag_szpc = hybrid_flag_s or hybrid_flag_z or hybrid_flag_p or hybrid_flag_c
 hybrid_flag_zh = hybrid_flag_z or hybrid_flag_h
@@ -798,7 +799,6 @@ macro add_rr_ss r_high, r_low, s_high, s_low
     jmp dispatch_loop
 endmacro
 
-; TODO: CODE REVIEW UP TO HERE
 macro adc_rr_ss r_high, r_low, s_high, s_low
     ; TODO: This is a super-inefficient implementation, let's get it correct before tuning it
 
@@ -873,8 +873,7 @@ macro sbc_rr_ss r_high, r_low, s_high, s_low
     ; take S, V, C from 6502 flags
     php
     pla
-    ; force Z, H clear so we can choose to set them below
-    and_not hybrid_flag_zh
+    and #hybrid_flag_spc
     ; force N on
     ora #hybrid_flag_n
     ; toggle 6502 carry to give Z80-style carry
@@ -903,6 +902,7 @@ macro sbc_rr_ss r_high, r_low, s_high, s_low
     jmp dispatch_loop
 endmacro
 
+; TODO: CODE REVIEW UP TO HERE
 ; Instruction: add hl,bc
 .opcode_handler_09
     add_rr_ss z80_h, z80_l, z80_b, z80_c
