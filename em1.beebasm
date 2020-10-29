@@ -696,6 +696,7 @@ macro inc_r r
 endmacro
 
 ; Instruction: nop
+; TODO: All nops (not just this one) could of course just have the dispatch table point directly to dispatch_loop rather than going via a stub routine like this which does jmp dispatch_loop
 .opcode_handler_nop
 .opcode_handler_00
     jmp dispatch_loop
@@ -2434,3 +2435,5 @@ endmacro
     ; useful ones.
     putfile "zexall/zexdoc-sf.cim", "T.ZEXALL", &8100, &8100
     save "Z80EM", start, end
+
+; TODO: Check undocumented Z80 PDF once emulation is mostly complete for any hints on subtle behaviour which I could fix up that might not be picked up by whatever test suites I am using
