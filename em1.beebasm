@@ -935,7 +935,6 @@ endmacro
     sta z80_f
     jmp dispatch_loop
 
-; TODO: CODE REVIEW UP TO HERE
 ; Instruction: ld de,**
 .opcode_handler_11
     ld_rr_16 z80_d, z80_e
@@ -1282,6 +1281,7 @@ endmacro
 
 ; Instruction: push af
 .opcode_handler_f5
+    ; TODO: This could be at least slightly more efficient, push doesn't corrupt X so we could do txa instead of la zp_tmp inside the push.
     ldx z80_f
     lda hybrid_to_z80_flag_table,x
     sta zp_tmp
@@ -1307,6 +1307,7 @@ endmacro
     advance_pc_and_load
     cp_6502_a
 
+    ; TODO CODE REVIEW UP TO HERE
 ; Instruction: sbc hl,bc
 .opcode_handler_ed_42
     sbc_rr_ss z80_h, z80_l, z80_b, z80_c
