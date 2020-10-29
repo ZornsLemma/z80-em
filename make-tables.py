@@ -65,6 +65,7 @@ with open("tables.beebasm", "w") as f:
             j |= hybrid_flag_s
         if i == 0x80:
             j |= hybrid_flag_p
-        if (i & 16) != ((i + 1) & 16):
+        # SFTODO? if (i & 16) != ((i - 1) & 16):
+        if ((((i - 1) & 0x0f) + 1) & 0x10) != 0:
             j |= hybrid_flag_h
         print("    equb %%%s ; &%02x %%%s" % (mybin(j), i, mybin(i)))
