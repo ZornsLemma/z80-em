@@ -1190,7 +1190,11 @@ endmacro
     push z80_d, z80_e
     jmp dispatch_loop
 
-; Instruction: call c, **
+; Instruction: jp c,**
+.opcode_handler_da
+    jp_flag_set hybrid_flag_c
+
+; Instruction: call c,**
 .opcode_handler_dc
     call_flag_set hybrid_flag_c
 
@@ -1589,7 +1593,7 @@ endmacro
     equw opcode_todo ; &d7
     equw opcode_todo ; &d8
     equw opcode_todo ; &d9
-    equw opcode_todo ; &da
+    equw opcode_handler_da
     equw opcode_todo ; &db
     equw opcode_handler_dc
     equw opcode_handler_dd
