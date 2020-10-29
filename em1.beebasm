@@ -1137,6 +1137,11 @@ endmacro
     lda z80_a
     or_6502_a
 
+; Instruction: cp (hl)
+.opcode_handler_be
+    lda_ind_hl
+    cp_6502_a
+
 ; Instruction: pop bc
 .opcode_handler_c1
     pop z80_b, z80_c
@@ -1556,7 +1561,7 @@ endmacro
     equw opcode_todo ; &bb
     equw opcode_todo ; &bc
     equw opcode_todo ; &bd
-    equw opcode_todo ; &be
+    equw opcode_handler_be
     equw opcode_todo ; &bf
     equw opcode_todo ; &c0
     equw opcode_handler_c1
