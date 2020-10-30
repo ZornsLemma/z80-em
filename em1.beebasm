@@ -2480,7 +2480,7 @@ endmacro
     puttext "boot.txt", "!BOOT", 0
     ; TODO: Starting with a self-built version of the documented instructions test - I may 
     ; well do undocumented instructions eventually but seems best to start with the more
-    ; useful ones.
+    ; useful ones. (Actually I think it's more about whether the undocumented *flags* are tested.)
     putfile "zexall/zexdoc-sf.cim", "T.ZEXALL", &8100, &8100
     save "Z80EM", start, end
 
