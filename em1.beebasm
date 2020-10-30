@@ -846,6 +846,7 @@ macro adc_rr_ss r_high, r_low, s_high, s_low
 endmacro
 
 macro sbc_rr_ss r_high, r_low, s_high, s_low
+    ; Note that r and s might be the same register pair
     ; TODO: This is a super-inefficient implementation based on b-em's code; let's see if I can get this to pass some tests before trying to rewrite it to be modestly efficient.
     lda r_high
     sta zp_tmp + 1
@@ -1307,7 +1308,6 @@ endmacro
     advance_pc_and_load
     cp_6502_a
 
-    ; TODO CODE REVIEW UP TO HERE
 ; Instruction: sbc hl,bc
 .opcode_handler_ed_42
     sbc_rr_ss z80_h, z80_l, z80_b, z80_c
