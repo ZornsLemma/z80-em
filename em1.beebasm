@@ -69,6 +69,7 @@ endmacro
     ; performance impact if we're short on zero page space.
     inc z80_pch_logical
     inc z80_pch_physical
+    ; TODO: bit:bvc instead of lda:bmp:bne?
     lda z80_pch_physical
     cmp #&c0
     bne new_pc_page_return
@@ -96,6 +97,7 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 .z80_e equb 0
 .z80_h equb 0
 .z80_l equb 0
+; TODO: Just for consistency with the 8-bit registers, define these as e.g. z80_sph and z80_spl, rather than using z80_sp + 1 to refer to the high byte? Should have no effect on the emulation behaviour.
 .z80_sp equw 0
 .z80_ix equw 0
 .z80_iy equw 0
@@ -107,7 +109,7 @@ z80_pch_physical = lda_z80_pc_physical_abs_y + 2
 ; the Z80 flags as efficiently as possible, z80_f holds "hybrid flags" - these
 ; are the Z80 flags but rearranged to use the 6502 bit positions. These need to
 ; be converted to use the correct bit positions when exposed to code running on
-; the emulated Z80. SFTODO: I AM ALSO TRYING TO "SHARE" THE V FLAG NOW
+; the emulated Z80 via push/pop af. SFTODO: I AM ALSO TRYING TO "SHARE" THE V FLAG NOW
 ;
 ;        b76543210
 ; Hybrid: SP H NZC
@@ -143,7 +145,7 @@ hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
     ; Initialise zero page.
     lda #0
     sta operand_ptr
-    ; TODO: Initialise other stuff too?
+    ; TODO: Initialise other stuff too? eg Z80 registers (see z80-documented.pdf)
 
     ; Store top of RAM at address 6. TODO: This is a bit of a hack but it seems
     ; to be what zexall wants to initialise sp; I suspect eventually this will
@@ -168,6 +170,7 @@ hybrid_flag_hpn = hybrid_flag_h or hybrid_flag_p or hybrid_flag_n
     ldx z80_pch_logical
     lda swr_bank_table,x
     page_in_bank_a
+    ; TODO: We could save two cycles by doing lda swr_pch_physical,x instead of the next three instructions, i.e. use a table.
     txa
     and #%00111111
     ora #%10000000
@@ -202,8 +205,8 @@ macro advance_pc_and_load
     cmp #&c0
     bne not_new_pc_bank
     jsr update_z80_pch_physical
-.not_new_pc_page
 .not_new_pc_bank
+.not_new_pc_page
     lda (z80_pc_physical),y
 endmacro
 
@@ -223,6 +226,7 @@ endmacro
 
 ; TODO: DESCRIBE
 ; TODO: MAKE A MACRO?
+; TODO: In many (not all) cases, our caller could equally well pass the value to us in X instead of A. In that case, we could save two cycles by replacing the tax:and:ora with lda table,x. We'd need a set_operand_ptr_using_x subroutine (more likely a macro, once I get to optimising), although I guess this using_a version would then just be implemented as tax:..._using_x
 .set_operand_ptr_using_a
     ; TODO: Would it be better to use Y instead of X? Not sure. It's just that typically we will do an ldy low_byte after calling this, so corrupting Y is potentially harmless. But in some cases maybe it's helpful that we've been able to pre-load Y before calling this.
     tax
@@ -250,14 +254,13 @@ endmacro
 .new_bank
     lda #&80
     sta operand_ptr + 1
-    ; TODO: This is a hack - it relies on the banks being contiguous on Master.
+    ; TODO: This is a hack - it relies on the banks being contiguous on Master. We could use a 16 element lookup table (ldx romsel_copy:lda next_swr_bank,x) to handle this more generally at negligible run-time cost.
     lda romsel_copy
     inc a
     page_in_bank_a
     rts
 }
 
-; TODO: Maybe fold storing/restoring Y into these macros as well? Change name of course.
 macro store_pc_bank_and_y
     sty z80_pcl_tmp
     ldy romsel_copy
@@ -369,6 +372,7 @@ macro ld_r_ind_hl r
     ld_r_ind_rr r, z80_h, z80_l
 endmacro
 
+; TODO: General comment - I need to be more consistent about identifying which macros are fragments and which end with jmp dispatch_loop. Some sort of convention indicating which registers and/or zp_tmp and/or Y/PC-ram-bank get corrupted or preserved might also be helpful.
 macro ld_ind_abs_rr high_r, low_r
     set_operand_ptr_using_imm_16
     lda low_r
@@ -627,7 +631,6 @@ endif
 .no_borrow
     lda z80_sp + 1
     jsr set_operand_ptr_using_a
-    ; TODO: Which order do the bytes get pushed onto the stack? This order seems logical but may not be correct.
     lda low
     sta (operand_ptr),y
     jsr bump_operand_ptr_y
