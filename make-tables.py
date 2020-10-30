@@ -49,7 +49,7 @@ with open("tables.beebasm", "w") as f:
             j |= hybrid_flag_s
         if i == 0x7f:
             j |= hybrid_flag_p
-        if (i & 8) != ((i + 1) & 8):
+        if (((i + 1) & 8) == 0) and ((i & 8) != 0):
             j |= hybrid_flag_h
         print("    equb %%%s ; &%02x %%%s" % (mybin(j), i, mybin(i)))
 
