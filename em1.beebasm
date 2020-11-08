@@ -752,7 +752,6 @@ endmacro
 
 ; Instruction: rlca
 .opcode_handler_07
-    ; TODO: b-em doesn't seem to clear H and N if I read the code right, but z80-documented.pdf does show these as getting cleared
     lda z80_a
     cmp #&80
     rol a
@@ -924,6 +923,7 @@ endmacro
 
 ; Instruction: rrca
 .opcode_handler_0f
+{
     ; TODO: An 8-bit rotate could be done using a lookup table (also in rlca, if it's faster there)
     lda z80_a
     lsr a
@@ -931,13 +931,13 @@ endmacro
     ora #&80
 .low_bit_0
     sta z80_a
-    ; TODO: b-em code doesn't seem to clear H or N
     lda z80_f
     and_not hybrid_flag_hnc
     assert hybrid_flag_c == 1
     adc #0
     sta z80_f
     jmp dispatch_loop
+}
 
 ; Instruction: ld de,**
 .opcode_handler_11

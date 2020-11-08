@@ -43,30 +43,34 @@ for i in range(256):
 print("")
 print("    align &100")
 print(".dec_flag_table")
-for i in range(256):
-    j = hybrid_flag_n
-    if i == 0:
-        j |= hybrid_flag_z
-    if i >= 0x80:
-        j |= hybrid_flag_s
-    if i == 0x7f:
-        j |= hybrid_flag_p
-    if (((i + 1) & 8) == 0) and ((i & 8) != 0):
-        j |= hybrid_flag_h
-    print("    equb %%%s ; &%02x %%%s" % (mybin(j), i, mybin(i)))
+for new_val in range(256):
+    flags = hybrid_flag_n
+    if new_val == 0:
+        flags |= hybrid_flag_z
+    if new_val >= 0x80:
+        flags |= hybrid_flag_s
+    if new_val == 0x7f:
+        flags |= hybrid_flag_p
+    old_val = (new_val + 1) & 0xff
+    # SFTODO? if (((i + 1) & 8) == 0) and ((i & 8) != 0):
+    if ((old_val & 8) == 0) and (((old_val - 1) & 8) != 0):
+        flags |= hybrid_flag_h
+    print("    equb %%%s ; &%02x %%%s" % (mybin(flags), new_val, mybin(new_val)))
 
 print("")
 print("    align &100")
 print(".inc_flag_table")
-for i in range(256):
-    j = 0
-    if i == 0:
-        j |= hybrid_flag_z
-    if i >= 0x80:
-        j |= hybrid_flag_s
-    if i == 0x80:
-        j |= hybrid_flag_p
+for new_val in range(256):
+    flags = 0
+    if new_val == 0:
+        flags |= hybrid_flag_z
+    if new_val >= 0x80:
+        flags |= hybrid_flag_s
+    if new_val == 0x80:
+        flags |= hybrid_flag_p
     # SFTODO? if (i & 16) != ((i - 1) & 16):
-    if ((((i - 1) & 0x0f) + 1) & 0x10) != 0:
-        j |= hybrid_flag_h
-    print("    equb %%%s ; &%02x %%%s" % (mybin(j), i, mybin(i)))
+    # SFTODO? if ((((i - 1) & 0x0f) + 1) & 0x10) != 0:
+    old_val = (new_val - 1) & 0xff
+    if (((old_val & 0xf) + 1) & 0x10) != 0:
+        flags |= hybrid_flag_h
+    print("    equb %%%s ; &%02x %%%s" % (mybin(flags), new_val, mybin(new_val)))
